@@ -8,6 +8,13 @@ export interface Detection {
   angle: number;
   /** 信頼度スコア（0.0-1.0） */
   score: number;
+  /** 推定Z軸座標（メートル単位、0に近いほど手前） */
+  depth?: number;
+  /** Z軸回りの傾き角度（pitch: 上下傾き、roll: 左右傾き）度単位 */
+  orientation?: {
+    pitch: number; // 上下傾き（-90～90度）
+    roll: number; // 左右傾き（-180～180度）
+  };
 }
 
 /**
@@ -26,6 +33,12 @@ export interface ObjectDetectorOptions {
   memoryThreshold?: number;
   /** TensorFlow.jsバックエンド。デフォルト: 'webgl' */
   backend?: "webgl" | "webgpu" | "wasm" | "cpu";
+  /** Z軸推定を有効にする。デフォルト: false */
+  enableDepthEstimation?: boolean;
+  /** カメラの焦点距離（ピクセル単位）。デフォルト: 500 */
+  focalLength?: number;
+  /** Z軸傾き推定を有効にする。デフォルト: false */
+  enableOrientationEstimation?: boolean;
   /** 物体検出時に呼び出されるコールバック関数 */
   onDetection?: (detection: Detection) => void;
   /** カメラの初期化完了時に呼び出されるコールバック関数 */
@@ -47,6 +60,12 @@ export interface YOLOInferenceOptions {
   scoreThreshold?: number;
   /** メモリクリーンアップを実行するテンソル数の闾値。デフォルト: 50 */
   memoryThreshold?: number;
+  /** Z軸推定を有効にする。デフォルト: false */
+  enableDepthEstimation?: boolean;
+  /** カメラの焦点距離（ピクセル単位）。デフォルト: 500 */
+  focalLength?: number;
+  /** Z軸傾き推定を有効にする。デフォルト: false */
+  enableOrientationEstimation?: boolean;
 }
 
 /**

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MitsukeLive - Z軸推定AR デモ</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import * as MitsukeLive from "../dist/index.js";
+
+      const { createApp, ref, onMounted, onUnmounted } = Vue;
+
+      // MitsukeLive Z軸推定AR アプリ
+      const ARApp = {
+        setup() {
+          const status = ref("初期化中...");
+          const detectionInfo = ref(null);
+          const error = ref("");
+          const isDetecting = ref(false);
+
+          let detector = null;
+          let scene, camera, renderer;
+          let detectedObjects = [];
+
+          // Three.js 初期化
+          const initThreeJS = () => {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(
+              75,
+              window.innerWidth / window.innerHeight,
+              0.1,
+              1000
+            );
+            renderer = new THREE.WebGLRenderer({ alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.domElement.className = "three-canvas";
+            document
+              .querySelector(".camera-container")
+              .appendChild(renderer.domElement);
+
+            // ライト追加
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+
+            animate();
+          };
+
+          // アニメーションループ
+          const animate = () => {
+            requestAnimationFrame(animate);
+
+            // 検出されたオブジェクトを回転
+            detectedObjects.forEach((obj) => {
+              obj.rotation.y += 0.01;
+            });
+
+            renderer.render(scene, camera);
+          };
+
+          // 3Dオブジェクトを配置
+          const place3DObject = (detection) => {
+            // 既存オブジェクトをクリア
+            detectedObjects.forEach((obj) => scene.remove(obj));
+            detectedObjects = [];
+
+            const [x, y, width, height] = detection.boundingBox;
+
+            // 画面座標を3D座標に変換（ビデオサイズを考慮）
+            const video = document.getElementById("video");
+            const videoRect = video.getBoundingClientRect();
+
+            // ビデオサイズに対する相対位置を計算
+            const relativeX = (x + width / 2) / video.videoWidth;
+            const relativeY = (y + height / 2) / video.videoHeight;
+
+            // NDC座標に変換（-1から1の範囲）
+            const screenX = relativeX * 2 - 1;
+            const screenY = -(relativeY * 2 - 1);
+            const worldZ = detection.depth ? -detection.depth : -2;
+
+            // 3Dボックスを作成
+            const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const material = new THREE.MeshLambertMaterial({
+              color: 0x00ff88,
+              transparent: true,
+              opacity: 0.8,
+            });
+            const cube = new THREE.Mesh(geometry, material);
+
+            // 位置設定
+            cube.position.set(
+              screenX * Math.abs(worldZ) * 0.5,
+              screenY * Math.abs(worldZ) * 0.5,
+              worldZ
+            );
+
+            // 傾きを適用
+            if (detection.orientation) {
+              cube.rotation.x = THREE.MathUtils.degToRad(
+                detection.orientation.pitch
+              );
+              cube.rotation.z = THREE.MathUtils.degToRad(
+                detection.orientation.roll
+              );
+            }
+
+            scene.add(cube);
+            detectedObjects.push(cube);
+          };
+
+          // 物体サイズ登録（現在のライブラリではサポートされていないためコメントアウト）
+          const registerObjectSizes = () => {
+            // if (MitsukeLive) {
+            //   // 名刺サイズを登録（標準的な名刺サイズ）
+            //   MitsukeLive.setObjectSize("business_card", 0.091, 0.055); // 91mm x 55mm
+            //   MitsukeLive.setObjectSize("logo", 0.05, 0.05); // 50mm x 50mm のロゴ
+            // }
+          };
+
+          // 検出器初期化
+          const initDetector = async () => {
+            try {
+              status.value = "カメラを初期化中...";
+
+              // MitsukeLiveライブラリを動的ロード（実際の実装では適切にインポート）
+              if (!MitsukeLive) {
+                throw new Error("MitsukeLive ライブラリが読み込まれていません");
+              }
+
+              // 物体サイズを登録
+              registerObjectSizes();
+
+              const options = {
+                modelPath: "../models/model.json",
+                metadataPath: "../models/metadata.yaml",
+                enableDepthEstimation: true, // Z軸推定を有効化
+                enableOrientationEstimation: true, // 傾き推定を有効化
+                focalLength: 500, // カメラ焦点距離
+
+                onCameraReady: () => {
+                  status.value = "物体をスキャンしてください";
+                },
+
+                onDetection: async (detection) => {
+                  if (!isDetecting.value) return;
+
+                  detectionInfo.value = {
+                    score: (detection.score * 100).toFixed(1),
+                    depth: detection.depth ? detection.depth.toFixed(2) : "N/A",
+                    pitch: detection.orientation?.pitch?.toFixed(1) || "0",
+                    roll: detection.orientation?.roll?.toFixed(1) || "0",
+                    box: detection.boundingBox.map((v) => Math.round(v)),
+                  };
+
+                  // 3Dオブジェクトを配置
+                  place3DObject(detection);
+
+                  // クライアント用点滅エフェクトを使用
+                  await MitsukeLive.startClientFlashEffect(
+                    document.getElementById("canvas"),
+                    detection,
+                    {
+                      interval: 200, // 200msで点滅
+                      count: 3, // 3回点滅
+                      color: "#00ff88", // 緑色の枠
+                      lineWidth: 3, // 太さ3px
+                    }
+                  );
+
+                  // 検知後は自動的にポーズされるため、UIを更新
+                  isDetecting.value = false;
+                  status.value = "検出完了 - 再開するには▶️をクリック";
+                },
+
+                onCameraNotAllowed: () => {
+                  error.value = "カメラアクセスが拒否されました";
+                },
+              };
+
+              detector = new MitsukeLive.DetectionController(options);
+              await detector.initialize("video", "canvas");
+              isDetecting.value = true;
+            } catch (err) {
+              error.value = `初期化エラー: ${err.message}`;
+              console.error("Detection initialization failed:", err);
+            }
+          };
+
+          // 制御機能
+          const toggleDetection = () => {
+            if (detector) {
+              if (isDetecting.value) {
+                detector.pause();
+                isDetecting.value = false;
+                status.value = "検出停止中";
+                // ポーズ時に3Dオブジェクトをクリア
+                clearObjects();
+              } else {
+                detector.resume();
+                isDetecting.value = true;
+                status.value = "物体をスキャンしてください";
+              }
+            }
+          };
+
+          const clearObjects = () => {
+            detectedObjects.forEach((obj) => scene.remove(obj));
+            detectedObjects = [];
+            detectionInfo.value = null;
+          };
+
+          onMounted(() => {
+            initThreeJS();
+            initDetector();
+          });
+
+          onUnmounted(() => {
+            if (detector) {
+              detector.dispose();
+            }
+          });
+
+          return {
+            status,
+            detectionInfo,
+            error,
+            isDetecting,
+            toggleDetection,
+          };
+        },
+
+        template: `
+        <div class="ar-app">
+          <div class="camera-container">
+            <video id="video" class="camera-video" autoplay muted playsinline></video>
+            <canvas id="canvas" class="camera-canvas"></canvas>
+          </div>
+
+          <div class="message">
+            <div :class="{ status: !error, error: error }">
+              {{ error || status }}
+            </div>
+          </div>
+
+          <div class="controls">
+            <button class="control-btn" @click="toggleDetection" :title="isDetecting ? '検出停止' : '検出開始'">
+              <i :class="isDetecting ? 'mdi mdi-pause' : 'mdi mdi-play'"></i>
+            </button>
+          </div>
+
+          <div class="info-panel" v-if="detectionInfo">
+            <div><strong>🎯 検出情報 (Z軸推定付き)</strong></div>
+            <div class="detection-info">
+              <div>信頼度: {{ detectionInfo.score }}%</div>
+              <div>深度: {{ detectionInfo.depth }}m</div>
+              <div>上下傾き: {{ detectionInfo.pitch }}°</div>
+              <div>左右傾き: {{ detectionInfo.roll }}°</div>
+              <div>位置: [{{ detectionInfo.box.join(', ') }}]</div>
+              <div>3D表示: ✅</div>
+            </div>
+          </div>
+        </div>
+      `,
+      };
+
+      // アプリをマウント
+      createApp(ARApp).mount("#app");
+
+      // デモ用のモックライブラリ（実際の使用時は削除）
+      if (!MitsukeLive) {
+        console.warn("デモモード: MitsukeLiveライブラリをモック化");
+        window.MitsukeLive = {
+          setObjectSize: (name, w, h) =>
+            console.log(`物体サイズ登録: ${name} = ${w}x${h}m`),
+          DetectionController: class {
+            constructor(options) {
+              this.options = options;
+              setTimeout(() => options.onCameraReady?.(), 1000);
+
+              // デモ用の定期検出
+              setInterval(() => {
+                if (this.options.onDetection) {
+                  this.options.onDetection?.({
+                    boundingBox: [
+                      100 + Math.random() * 200,
+                      100 + Math.random() * 200,
+                      150,
+                      100,
+                    ],
+                    score: 0.8 + Math.random() * 0.2,
+                    angle: 0,
+                    depth: 1 + Math.random() * 3,
+                    orientation: {
+                      pitch: (Math.random() - 0.5) * 20,
+                      roll: (Math.random() - 0.5) * 30,
+                    },
+                  });
+                }
+              }, 3000);
+            }
+            async initialize() {
+              return Promise.resolve();
+            }
+            pause() {
+              console.log("検出停止");
+            }
+            resume() {
+              console.log("検出再開");
+            }
+            dispose() {
+              console.log("リソース解放");
+            }
+          },
+        };
+      }
+    </script>
+  </body>
+</html>

@@ -8,6 +8,10 @@ import type {
   YOLOMetadata,
 } from "../types";
 import { transformToCanvas, findValidDetections } from "../helpers/yolo-helper";
+import {
+  addDepthToDetections,
+  type DepthEstimationOptions,
+} from "../helpers/depth-estimator";
 
 /**
  * YOLO推論インスタンス
@@ -18,6 +22,9 @@ export class YOLOInference {
   private metadata: YOLOMetadata | null = null; // モデルのメタデータ情報
   private scoreThreshold: number; // 検出の最低信頼度スコア
   private memoryThreshold: number; // メモリクリーンアップの閾値
+  private enableDepthEstimation: boolean; // Z軸推定の有効化フラグ
+  private focalLength: number; // カメラの焦点距離
+  private enableOrientationEstimation: boolean; // Z軸傾き推定の有効化フラグ
 
   /**
    * YOLO推論の設定
@@ -25,6 +32,10 @@ export class YOLOInference {
   constructor(private options: YOLOInferenceOptions) {
     this.scoreThreshold = options.scoreThreshold || 0.7;
     this.memoryThreshold = options.memoryThreshold || 50;
+    this.enableDepthEstimation = options.enableDepthEstimation || false;
+    this.focalLength = options.focalLength || 500;
+    this.enableOrientationEstimation =
+      options.enableOrientationEstimation || false;
   }
 
   /**
@@ -61,6 +72,20 @@ export class YOLOInference {
           letterboxInfo,
           canvasElement
         );
+      }
+
+      // Z軸推定の追加
+      if (
+        (this.enableDepthEstimation || this.enableOrientationEstimation) &&
+        canvasElement
+      ) {
+        const depthOptions: DepthEstimationOptions = {
+          focalLength: this.focalLength,
+          imageWidth: canvasElement.width,
+          imageHeight: canvasElement.height,
+          enableOrientationEstimation: this.enableOrientationEstimation,
+        };
+        predictions = addDepthToDetections(predictions, depthOptions);
       }
 
       this.logMemoryUsage();

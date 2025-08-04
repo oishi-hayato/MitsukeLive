@@ -10,11 +10,15 @@ export default defineConfig({
       fileName: () => "index.js",
     },
     rollupOptions: {
-      external: ["@tensorflow/tfjs", "js-yaml"],
+      external: [],
       output: {
-        globals: {
-          "@tensorflow/tfjs": "tf",
-          "js-yaml": "jsyaml",
+        manualChunks: {
+          tensorflow: ["@tensorflow/tfjs"],
+          yaml: ["js-yaml"],
+          core: [
+            "src/lib/detection-controller.ts",
+            "src/lib/yolo-inference.ts",
+          ],
         },
       },
     },
