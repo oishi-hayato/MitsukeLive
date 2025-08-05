@@ -13,7 +13,7 @@ body {
 }
 
 /* メインアプリケーション */
-.ar-app {
+.detection-app {
   position: relative;
   width: 100vw;
   height: 100vh;
@@ -91,17 +91,45 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.info-header {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
 .detection-info {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.info-item .label {
+  flex: 0 0 auto;
+  margin-right: 20px;
+}
+
+.info-item .label {
+  color: #ccc;
+  font-size: 13px;
+}
+
+.info-item .value {
+  flex: 1 1 auto;
+  text-align: right;
+  color: #fff;
+  font-weight: 500;
+  font-family: "SF Mono", Monaco, monospace;
 }
 
 @media (max-width: 480px) {
   .detection-info {
     grid-template-columns: 1fr;
-    gap: 5px;
+    gap: 6px;
   }
 }
 

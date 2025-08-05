@@ -1,104 +1,103 @@
-# MitsukeLive AR Example
+# MitsukeLive Examples
 
-MitsukeLive + Z軸推定機能のシンプルなARデモです。
+MitsukeLive ライブラリの使用例です。
 
-## 📁 ファイル構成
+## Examples
 
-- `ar-simple.html` - Vue3 + Three.js を使ったシンプルなARアプリ
+### 1. object-detection-2d.html
 
-## 🚀 使用方法
+基本的な 2D 物体検出のデモです。
 
-### 1. ローカルサーバーで起動
+**特徴:**
+
+- シンプルな物体検出
+- 信頼度と位置情報の表示
+- 検出時の点滅エフェクト
+
+**使用方法:**
 
 ```bash
-# MitsukeLiveプロジェクトのルートで
-cd example
-python -m http.server 8080
-# または
-npx serve .
+# ローカルサーバーを起動してアクセス
+python -m http.server 8000
+# ブラウザで http://localhost:8000/example/object-detection-2d.html
 ```
 
-### 2. ブラウザでアクセス
+### 2. object-detection-3d.html
+
+3D 情報付きの物体検出デモです。
+
+**特徴:**
+
+- 基本の物体検出 + 3D 推定機能
+- 深度（距離）と傾きの情報表示
+- 物体サイズの事前登録が必要
+
+**使用方法:**
+
+```bash
+# ローカルサーバーを起動してアクセス
+python -m http.server 8000
+# ブラウザで http://localhost:8000/example/object-detection-3d.html
+```
+
+## ファイル構成
 
 ```
-http://localhost:8080/ar-simple.html
+example/
+├── README.md                    # このファイル
+├── object-detection-2d.html     # 2D検出デモ
+├── object-detection-3d.html     # 3D検出デモ
+└── style.css                    # 共通スタイル
 ```
 
-### 3. 機能
+## 注意事項
 
-- 📷 **リアルタイムカメラ映像**
-- 🎯 **物体検出 + Z軸推定**
-- 📐 **3D姿勢推定（pitch/roll）**
-- 🎲 **Three.js 3Dオブジェクト表示**
-- ⚡ **点滅エフェクト**
-- 🎛️ **検出制御（開始/停止/クリア）**
+- HTTPS または localhost でのアクセスが必要（カメラアクセスのため）
+- 検出対象の物体サイズを事前に登録すると 3D 推定の精度が向上します
+- モデルファイル（models/）が必要です
 
-## 📊 Z軸推定機能
+## API 使用例
 
-### 物体サイズ登録
+### 基本的な 2D 検出
+
 ```javascript
-// 名刺サイズを登録（91mm x 55mm）
-MitsukeLive.setObjectSize('business_card', 0.091, 0.055);
+import * as MitsukeLive from "../dist/index.js";
 
-// ロゴサイズを登録（50mm x 50mm）
-MitsukeLive.setObjectSize('logo', 0.05, 0.05);
+const detector = new MitsukeLive.DetectionController({
+  modelPath: "../models/model.json",
+  metadataPath: "../models/metadata.yaml",
+  onDetection: (detection) => {
+    console.log("検出:", detection);
+  },
+});
+
+await detector.initialize("video", "canvas");
 ```
 
-### 検出結果
+### 3D 情報付き検出
+
 ```javascript
-{
-  boundingBox: [x, y, width, height],  // 2D位置
-  score: 0.85,                         // 信頼度
-  depth: 1.23,                         // 推定深度（メートル）
-  orientation: {
-    pitch: 5.2,                        // 上下傾き（度）
-    roll: -2.8                         // 左右傾き（度）
-  }
-}
+import * as MitsukeLive from "../dist/index.js";
+
+// 物体サイズを登録
+MitsukeLive.setObjectSize("icon", 0.091, 0.055); // 91mm x 55mm
+
+const detector = new MitsukeLive.DetectionController({
+  modelPath: "../models/model.json",
+  metadataPath: "../models/metadata.yaml",
+  onDetection: (detection) => {
+    // 3D情報を追加
+    const enhanced3D = MitsukeLive.add3DToDetection(detection, {
+      focalLength: 500,
+      imageWidth: 640,
+      imageHeight: 640,
+      className: "icon",
+      enableOrientationEstimation: true,
+    });
+
+    console.log("3D検出:", enhanced3D);
+  },
+});
+
+await detector.initialize("video", "canvas");
 ```
-
-### 3D配置
-```javascript
-// Three.jsでの3D配置
-cube.position.set(screenX * depth, screenY * depth, -depth);
-cube.rotation.x = THREE.MathUtils.degToRad(pitch);
-cube.rotation.z = THREE.MathUtils.degToRad(roll);
-```
-
-## 🎮 操作方法
-
-- **▶️/⏸️ボタン**: 検出の開始/停止
-- **🗑️ボタン**: 3Dオブジェクトをクリア
-- **自動検出**: 物体を検出すると自動で3Dオブジェクトが表示
-
-## 🔧 カスタマイズ
-
-### モデル変更
-```javascript
-const options = {
-  modelPath: '/your-model/model.json',
-  metadataPath: '/your-model/metadata.yaml',
-  // ...
-};
-```
-
-### 3Dオブジェクト変更
-```javascript
-// ar-simple.html の place3DObject 関数内
-const geometry = new THREE.SphereGeometry(0.1, 16, 16); // 球体に変更
-const material = new THREE.MeshLambertMaterial({ color: 0xff0088 }); // 色変更
-```
-
-## 📝 ar-meishiとの違い
-
-| 項目 | ar-meishi | ar-simple |
-|------|-----------|-----------|
-| フレームワーク | Vue3 + Router | Vue3のみ |
-| 3D表示 | なし | Three.js |
-| Z軸推定 | なし | あり |
-| 傾き推定 | なし | あり |
-| コンポーネント | 複数分割 | 単一ファイル |
-| ダイアログ | あり | なし |
-| スプラッシュ | あり | なし |
-
-シンプルで分かりやすい実装になっています！

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MitsukeLive - 2D物体検出デモ</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css"
+    />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import * as MitsukeLive from "../dist/index.js";
+
+      const { createApp, ref, onMounted, onUnmounted } = Vue;
+
+      // 定数
+      const FLASH_CONFIG = {
+        interval: 200,
+        count: 3,
+        color: "#00ff88",
+        lineWidth: 3,
+      };
+
+      const DETECTOR_CONFIG = {
+        modelPath: "../models/model.json",
+        metadataPath: "../models/metadata.yaml",
+      };
+
+      const MESSAGES = {
+        INITIALIZING: "初期化中...",
+        CAMERA_INIT: "カメラを初期化中...",
+        READY: "物体をスキャンしてください",
+        DETECTION_COMPLETE: "検出完了 - 再開するには▶️をクリック",
+        PAUSED: "検出停止中",
+        CAMERA_DENIED: "カメラアクセスが拒否されました",
+      };
+
+      // 物体検出アプリ
+      const DetectionApp = {
+        setup() {
+          // リアクティブ状態
+          const state = {
+            status: ref(MESSAGES.INITIALIZING),
+            detectionInfo: ref(null),
+            error: ref(""),
+            isDetecting: ref(false),
+          };
+
+          let detector = null;
+
+          // 検出情報をフォーマット
+          const formatDetectionInfo = (detection) => ({
+            score: (detection.score * 100).toFixed(1),
+            box: detection.boundingBox.map((v) => Math.round(v)),
+          });
+
+          // 検出時の処理
+          const handleDetection = async (detection) => {
+            if (!state.isDetecting.value) return;
+
+            // 検出情報を更新
+            state.detectionInfo.value = formatDetectionInfo(detection);
+
+            // 点滅エフェクト
+            await MitsukeLive.startClientFlashEffect(
+              document.getElementById("canvas"),
+              detection,
+              FLASH_CONFIG
+            );
+
+            // 検出完了後の状態更新
+            state.isDetecting.value = false;
+            state.status.value = MESSAGES.DETECTION_COMPLETE;
+          };
+
+          // 検出器の初期化
+          const initDetector = async () => {
+            try {
+              state.status.value = MESSAGES.CAMERA_INIT;
+
+              if (!MitsukeLive) {
+                throw new Error("MitsukeLive ライブラリが読み込まれていません");
+              }
+
+              const options = {
+                ...DETECTOR_CONFIG,
+                onCameraReady: () => {
+                  state.status.value = MESSAGES.READY;
+                },
+                onDetection: handleDetection,
+                onCameraNotAllowed: () => {
+                  state.error.value = MESSAGES.CAMERA_DENIED;
+                },
+              };
+
+              detector = new MitsukeLive.DetectionController(options);
+              await detector.initialize("video", "canvas");
+              state.isDetecting.value = true;
+            } catch (err) {
+              state.error.value = `初期化エラー: ${err.message}`;
+              console.error("Detection initialization failed:", err);
+            }
+          };
+
+          // 検出の開始/停止
+          const toggleDetection = () => {
+            if (!detector) return;
+
+            if (state.isDetecting.value) {
+              detector.pause();
+              state.isDetecting.value = false;
+              state.status.value = MESSAGES.PAUSED;
+              state.detectionInfo.value = null;
+            } else {
+              detector.resume();
+              state.isDetecting.value = true;
+              state.status.value = MESSAGES.READY;
+            }
+          };
+
+          // ライフサイクル
+          onMounted(initDetector);
+          onUnmounted(() => {
+            if (detector) {
+              detector.dispose();
+            }
+          });
+
+          return {
+            ...state,
+            toggleDetection,
+          };
+        },
+
+        template: `
+          <div class="detection-app">
+            <div class="camera-container">
+              <video id="video" class="camera-video" autoplay muted playsinline></video>
+              <canvas id="canvas" class="camera-canvas"></canvas>
+            </div>
+
+            <div class="message">
+              <div :class="{ status: !error, error: error }">
+                {{ error || status }}
+              </div>
+            </div>
+
+            <div class="controls">
+              <button 
+                class="control-btn" 
+                @click="toggleDetection" 
+                :title="isDetecting ? '検出停止' : '検出開始'"
+              >
+                <i :class="isDetecting ? 'mdi mdi-pause' : 'mdi mdi-play'"></i>
+              </button>
+            </div>
+
+            <div class="info-panel" v-if="detectionInfo">
+              <div class="info-header">検出情報</div>
+              <div class="detection-info">
+                <div class="info-item">
+                  <span class="label">信頼度:</span>
+                  <span class="value">{{ detectionInfo.score }}%</span>
+                </div>
+                <div class="info-item">
+                  <span class="label">位置:</span>
+                  <span class="value">[{{ detectionInfo.box.join(', ') }}]</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `,
+      };
+
+      // アプリをマウント
+      createApp(DetectionApp).mount("#app");
+    </script>
+  </body>
+</html>

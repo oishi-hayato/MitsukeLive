@@ -67,9 +67,6 @@ export class DetectionController {
       metadataPath: options.metadataPath,
       scoreThreshold: options.scoreThreshold,
       memoryThreshold: options.memoryThreshold,
-      enableDepthEstimation: options.enableDepthEstimation,
-      focalLength: options.focalLength,
-      enableOrientationEstimation: options.enableOrientationEstimation,
     });
 
     this.onDetection = options.onDetection || (() => {});

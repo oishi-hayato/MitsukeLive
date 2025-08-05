@@ -33,12 +33,6 @@ export interface ObjectDetectorOptions {
   memoryThreshold?: number;
   /** TensorFlow.jsバックエンド。デフォルト: 'webgl' */
   backend?: "webgl" | "webgpu" | "wasm" | "cpu";
-  /** Z軸推定を有効にする。デフォルト: false */
-  enableDepthEstimation?: boolean;
-  /** カメラの焦点距離（ピクセル単位）。デフォルト: 500 */
-  focalLength?: number;
-  /** Z軸傾き推定を有効にする。デフォルト: false */
-  enableOrientationEstimation?: boolean;
   /** 物体検出時に呼び出されるコールバック関数 */
   onDetection?: (detection: Detection) => void;
   /** カメラの初期化完了時に呼び出されるコールバック関数 */
@@ -60,12 +54,6 @@ export interface YOLOInferenceOptions {
   scoreThreshold?: number;
   /** メモリクリーンアップを実行するテンソル数の闾値。デフォルト: 50 */
   memoryThreshold?: number;
-  /** Z軸推定を有効にする。デフォルト: false */
-  enableDepthEstimation?: boolean;
-  /** カメラの焦点距離（ピクセル単位）。デフォルト: 500 */
-  focalLength?: number;
-  /** Z軸傾き推定を有効にする。デフォルト: false */
-  enableOrientationEstimation?: boolean;
 }
 
 /**

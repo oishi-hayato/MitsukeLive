@@ -6,6 +6,11 @@ export {
   startClientFlashEffect,
   type ClientFlashOptions,
 } from "./lib/client-flash";
+export {
+  setObjectSize,
+  add3DToDetection,
+  type ThreeDEstimationOptions,
+} from "./helpers/3d-estimator";
 
 import { DetectionController } from "./lib/detection-controller";
 import type { ObjectDetectorOptions } from "./types";
