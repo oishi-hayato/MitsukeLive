@@ -115,8 +115,8 @@ export function estimate3DInfo(
   const depthFromWidth = (realSize.width * focalLength) / width;
   const depthFromHeight = (realSize.height * focalLength) / height;
   const depth = Math.max(
-    0.1,
-    Math.min(100, Math.min(depthFromWidth, depthFromHeight))
+    0.01,
+    Math.min(10, Math.min(depthFromWidth, depthFromHeight))
   );
 
   const result: ThreeDInfo = { depth };

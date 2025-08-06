@@ -5,6 +5,7 @@ import { YOLOInference } from "./yolo-inference";
 import { MLInternalError } from "../errors";
 import { cropNormalizedVideoTensor } from "../helpers/tensor-helper";
 import { letterboxTransform } from "../helpers/yolo-helper";
+import { add3DToDetection } from "../helpers/3d-estimator";
 import type {
   ObjectDetectorOptions,
   Detection,
@@ -48,9 +49,17 @@ export class DetectionController {
   private lastVideoDimensions?: { width: number; height: number }; // 前回のビデオサイズ
   private lastCanvasDimensions?: { width: number; height: number }; // 前回のキャンバスサイズ
 
-  private onDetection: (detection: Detection) => void; // 検出結果コールバック
+  private onDetection: (detection: Detection | null) => void; // 検出結果コールバック
   private onCameraReady: () => void; // カメラ準備完了コールバック
   private onCameraNotAllowed: () => void; // カメラアクセス拒否コールバック
+
+  // 3D推定設定
+  private enable3D: boolean; // 3D推定を有効にするかどうか
+
+  private threeDOptions?: ObjectDetectorOptions["threeDOptions"]; // 3D推定のオプション
+
+  // 連続検出設定
+  private continuousDetection: boolean; // 連続検出モードを有効にするかどうか
 
   /**
    * コントローラーの初期設定
@@ -72,6 +81,13 @@ export class DetectionController {
     this.onDetection = options.onDetection || (() => {});
     this.onCameraReady = options.onCameraReady || (() => {});
     this.onCameraNotAllowed = options.onCameraNotAllowed || (() => {});
+
+    // 3D推定設定
+    this.enable3D = options.enable3D || false;
+    this.threeDOptions = options.threeDOptions;
+
+    // 連続検出設定
+    this.continuousDetection = options.continuousDetection || false;
   }
 
   /**
@@ -239,10 +255,25 @@ export class DetectionController {
    */
   private handleDetectionResults(detectionResults: Detection[]): void {
     if (detectionResults.length > 0) {
+      let result = detectionResults[0];
+
+      // 3D推定が有効で設定が揃っている場合は3D情報を追加
+      if (this.enable3D && this.threeDOptions) {
+        result = add3DToDetection(result, this.threeDOptions);
+      }
+
       // 最高スコアの検出結果を通知
-      this.onDetection(detectionResults[0]);
-      // 検出後は一時停止してユーザーの確認を待つ
-      this.pause();
+      this.onDetection(result);
+
+      // 連続検出モードでない場合のみ一時停止
+      if (!this.continuousDetection) {
+        this.pause();
+      }
+    } else {
+      // 連続検出モードの場合は検出できなかった状態も通知
+      if (this.continuousDetection) {
+        this.onDetection(null);
+      }
     }
   }
 

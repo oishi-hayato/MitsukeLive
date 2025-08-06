@@ -64,19 +64,22 @@
           const handleDetection = async (detection) => {
             if (!state.isDetecting.value) return;
 
-            // 検出情報を更新
-            state.detectionInfo.value = formatDetectionInfo(detection);
+            if (detection) {
+              // 検出情報を更新
+              state.detectionInfo.value = formatDetectionInfo(detection);
 
-            // 点滅エフェクト
-            await MitsukeLive.startClientFlashEffect(
-              document.getElementById("canvas"),
-              detection,
-              FLASH_CONFIG
-            );
+              // 点滅エフェクト
+              await MitsukeLive.startClientFlashEffect(
+                document.getElementById("canvas"),
+                detection,
+                FLASH_CONFIG
+              );
 
-            // 検出完了後の状態更新
-            state.isDetecting.value = false;
-            state.status.value = MESSAGES.DETECTION_COMPLETE;
+              // 検出完了後の状態更新
+              state.isDetecting.value = false;
+              state.status.value = MESSAGES.DETECTION_COMPLETE;
+            }
+            // 2Dデモでは検出失敗時は何もしない（従来通りの動作）
           };
 
           // 検出器の初期化

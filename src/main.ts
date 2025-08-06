@@ -8,7 +8,6 @@ export {
 } from "./lib/client-flash";
 export {
   setObjectSize,
-  add3DToDetection,
   type ThreeDEstimationOptions,
 } from "./helpers/3d-estimator";
 

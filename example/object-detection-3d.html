@@ -10,6 +10,7 @@
       href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css"
     />
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
   </head>
   <body>
     <div id="app"></div>
@@ -61,11 +62,182 @@
           };
 
           let detector = null;
+          let scene = null;
+          let camera = null;
+          let renderer = null;
+          let cube = null;
+          let animationId = null;
+
+          // Three.jsシーンの初期化
+          const initThreeJS = () => {
+            const canvas = document.getElementById("ar-canvas");
+            const video = document.getElementById("video");
+
+            // レンダラー作成
+            renderer = new THREE.WebGLRenderer({
+              canvas: canvas,
+              alpha: true,
+              antialias: true,
+            });
+
+            // キャンバスサイズに合わせてレンダラーサイズを設定
+            const detectionCanvas = document.getElementById("canvas");
+            renderer.setSize(detectionCanvas.width, detectionCanvas.height);
+
+            // ARキャンバスのCSSサイズも同期
+            canvas.style.width =
+              detectionCanvas.style.width || `${detectionCanvas.width}px`;
+            canvas.style.height =
+              detectionCanvas.style.height || `${detectionCanvas.height}px`;
+
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            // シーン作成
+            scene = new THREE.Scene();
+
+            // カメラ作成
+            camera = new THREE.PerspectiveCamera(
+              50, // 視野角を狭くして遠近感を調整
+              detectionCanvas.width / detectionCanvas.height,
+              0.1,
+              100
+            );
+            camera.position.z = 0; // カメラを原点に配置
+
+            // キューブ作成（大きくして見えやすく）
+            const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2); // 20cm x 20cm x 20cm
+            const material = new THREE.MeshBasicMaterial({
+              color: 0x00ff88,
+              wireframe: true,
+            });
+            cube = new THREE.Mesh(geometry, material);
+            cube.visible = false; // 初期は非表示
+            scene.add(cube);
+
+            // ライト追加
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+          };
+
+          // Three.jsアニメーションループ
+          const animate = () => {
+            animationId = requestAnimationFrame(animate);
+
+            if (cube && cube.visible) {
+              cube.rotation.x += 0.01;
+              cube.rotation.y += 0.01;
+            }
+
+            if (renderer && scene && camera) {
+              renderer.render(scene, camera);
+            }
+          };
+
+          // 3Dオブジェクトの位置を更新
+          const update3DObject = (detection) => {
+            if (!cube || !camera || !renderer) return;
+
+            // client-flashと完全に同じ座標計算を再現
+            const [x, y, width, height] = detection.boundingBox;
+
+            console.log("Detection box:", [x, y, width, height]);
+
+            // client-flashの処理：
+            // ctx.translate(x, y) → (x,y)位置に移動
+            // ctx.strokeRect(-w/2, -h/2, w, h) → その位置を中心に矩形描画
+            // つまり(x,y)が矩形の実際の中心座標
+            const centerX = x;
+            const centerY = y;
+
+            console.log("Flash center (same as translate point):", [centerX, centerY]);
+
+            // キャンバスサイズを取得
+            const detectionCanvas2 = document.getElementById("canvas");
+            const canvasWidth = detectionCanvas2.width;
+            const canvasHeight = detectionCanvas2.height;
+
+            console.log("Canvas size:", [canvasWidth, canvasHeight]);
+
+            // Three.jsでは画面座標からワールド座標への変換が必要
+            // より正確な方法：ワールド座標をピクセル座標で直接計算
+            
+            // カメラとレンダラーの設定から逆算
+            const vector = new THREE.Vector3();
+            
+            // キャンバス座標系をThree.jsの正規化デバイス座標に変換
+            vector.x = (centerX / canvasWidth) * 2 - 1;
+            vector.y = -(centerY / canvasHeight) * 2 + 1; // Y軸反転
+            vector.z = 0.5; // 中間の深度値
+            
+            // 正規化デバイス座標からワールド座標に変換
+            vector.unproject(camera);
+            
+            // 深度を使用してZ位置を設定
+            const depth = detection.depth || 1.0;
+            const targetZ = -Math.max(2, depth);
+            
+            // カメラからオブジェクトへの方向ベクトル
+            const direction = vector.sub(camera.position).normalize();
+            
+            // 指定されたZ位置でのワールド座標を計算
+            const distance = Math.abs(targetZ - camera.position.z);
+            cube.position.copy(camera.position).add(direction.multiplyScalar(distance));
+            cube.position.z = targetZ;
+
+            console.log("Screen coordinates:", [centerX, centerY]);
+            console.log("World coordinates:", cube.position);
+
+            // 深度とバウンディングボックスサイズに応じてオブジェクトサイズを調整
+            const detectionCanvas = document.getElementById("canvas");
+            const boxSizeRatio = Math.sqrt(
+              (width * height) /
+                (detectionCanvas.width * detectionCanvas.height)
+            ); // バウンディングボックスの画面占有率
+
+            // 深度とバウンディングボックスサイズを組み合わせてスケール計算
+            const depthScale = Math.max(0.5, Math.min(3.0, 1.0 / depth)); // 深度スケール（基準値を大きく）
+            const sizeScale = boxSizeRatio * depthScale * 2.0; // 最終スケール（基準値を2倍に）
+            const finalScale = Math.max(0.1, Math.min(2.5, sizeScale)); // 範囲制限（最小・最大値を拡大）
+
+            cube.scale.set(finalScale, finalScale, finalScale);
+
+            console.log("Box size ratio:", boxSizeRatio);
+            console.log("Depth scale:", depthScale);
+            console.log("Final scale:", finalScale);
+
+            console.log("Cube position:", cube.position);
+
+            // 滑らかな表示アニメーション
+            if (!cube.visible) {
+              cube.visible = true;
+              // 小さくスタートして拡大するアニメーション
+              cube.scale.set(finalScale * 0.1, finalScale * 0.1, finalScale * 0.1);
+              const targetScale = finalScale;
+              const animateScale = () => {
+                const currentScale = cube.scale.x;
+                if (currentScale < targetScale * 0.95) {
+                  const newScale = currentScale * 1.1;
+                  cube.scale.set(newScale, newScale, newScale);
+                  requestAnimationFrame(animateScale);
+                } else {
+                  cube.scale.set(targetScale, targetScale, targetScale);
+                }
+              };
+              animateScale();
+            } else {
+              // 既に表示されている場合は単純にスケールを設定
+              cube.scale.set(finalScale, finalScale, finalScale);
+              cube.visible = true;
+            }
+          };
 
           // 検出情報をフォーマット
           const formatDetectionInfo = (detection) => ({
             score: (detection.score * 100).toFixed(1),
-            depth: detection.depth ? detection.depth.toFixed(2) : "N/A",
+            depth: detection.depth ? detection.depth.toFixed(3) : "N/A",
             pitch: detection.orientation?.pitch?.toFixed(1) || "0",
             roll: detection.orientation?.roll?.toFixed(1) || "0",
             box: detection.boundingBox.map((v) => Math.round(v)),
@@ -75,26 +247,21 @@
           const handleDetection = async (detection) => {
             if (!state.isDetecting.value) return;
 
-            // 3D情報を追加（プラスα処理）
-            const enhanced3DDetection = MitsukeLive.add3DToDetection(
-              detection,
-              THREED_CONFIG
-            );
+            if (detection) {
+              // 検出情報を更新（3D情報は内部で自動的に追加される）
+              state.detectionInfo.value = formatDetectionInfo(detection);
+              // 3Dオブジェクトを配置
+              update3DObject(detection);
+            } else {
+              // 検出できなかった場合は情報と3Dオブジェクトを非表示
+              state.detectionInfo.value = null;
+              if (cube) {
+                cube.visible = false;
+              }
+            }
 
-            // 検出情報を更新
-            state.detectionInfo.value =
-              formatDetectionInfo(enhanced3DDetection);
-
-            // 点滅エフェクト
-            await MitsukeLive.startClientFlashEffect(
-              document.getElementById("canvas"),
-              enhanced3DDetection,
-              FLASH_CONFIG
-            );
-
-            // 検出完了後の状態更新
-            state.isDetecting.value = false;
-            state.status.value = MESSAGES.DETECTION_COMPLETE;
+            // 連続検出モードでは検出状態を継続
+            // （従来のワンショット検出とは異なり、継続的に物体を追跡）
           };
 
           // 検出器の初期化
@@ -107,12 +274,20 @@
               }
 
               // 3D推定用の物体サイズを登録
-              MitsukeLive.setObjectSize("icon", 0.091, 0.055); // 91mm x 55mm (名刺サイズ)
+              MitsukeLive.setObjectSize("icon", 0.02, 0.02); // 2cm x 2cm (4cm²)
 
               const options = {
                 ...DETECTOR_CONFIG,
+                enable3D: true,
+                threeDOptions: THREED_CONFIG,
+                continuousDetection: true,
                 onCameraReady: () => {
                   state.status.value = MESSAGES.READY;
+                  // カメラ準備完了後にThree.jsを初期化
+                  setTimeout(() => {
+                    initThreeJS();
+                    animate();
+                  }, 500);
                 },
                 onDetection: handleDetection,
                 onCameraNotAllowed: () => {
@@ -138,6 +313,9 @@
               state.isDetecting.value = false;
               state.status.value = MESSAGES.PAUSED;
               state.detectionInfo.value = null;
+              if (cube) {
+                cube.visible = false;
+              }
             } else {
               detector.resume();
               state.isDetecting.value = true;
@@ -148,6 +326,9 @@
           // ライフサイクル
           onMounted(initDetector);
           onUnmounted(() => {
+            if (animationId) {
+              cancelAnimationFrame(animationId);
+            }
             if (detector) {
               detector.dispose();
             }
@@ -161,9 +342,10 @@
 
         template: `
           <div class="detection-app">
-            <div class="camera-container">
+            <div class="camera-container" style="position: relative;">
               <video id="video" class="camera-video" autoplay muted playsinline></video>
               <canvas id="canvas" class="camera-canvas"></canvas>
+              <canvas id="ar-canvas" class="camera-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
             </div>
 
             <div class="message">
@@ -173,9 +355,9 @@
             </div>
 
             <div class="controls">
-              <button 
-                class="control-btn" 
-                @click="toggleDetection" 
+              <button
+                class="control-btn"
+                @click="toggleDetection"
                 :title="isDetecting ? '検出停止' : '検出開始'"
               >
                 <i :class="isDetecting ? 'mdi mdi-pause' : 'mdi mdi-play'"></i>
@@ -183,7 +365,7 @@
             </div>
 
             <div class="info-panel" v-if="detectionInfo">
-              <div class="info-header">検出情報</div>
+              <div class="info-header">検出情報 (AR表示中)</div>
               <div class="detection-info">
                 <div class="info-item">
                   <span class="label">信頼度:</span>

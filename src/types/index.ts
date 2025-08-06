@@ -33,12 +33,29 @@ export interface ObjectDetectorOptions {
   memoryThreshold?: number;
   /** TensorFlow.jsバックエンド。デフォルト: 'webgl' */
   backend?: "webgl" | "webgpu" | "wasm" | "cpu";
-  /** 物体検出時に呼び出されるコールバック関数 */
-  onDetection?: (detection: Detection) => void;
+  /** 物体検出時に呼び出されるコールバック関数（検出できない場合はnull） */
+  onDetection?: (detection: Detection | null) => void;
   /** カメラの初期化完了時に呼び出されるコールバック関数 */
   onCameraReady?: () => void;
   /** カメラアクセスが許可されていない時に呼び出されるコールバック関数 */
   onCameraNotAllowed?: () => void;
+  /** 3D推定を有効にする */
+  enable3D?: boolean;
+  /** 3D推定のオプション（enable3D=trueの場合に使用） */
+  threeDOptions?: {
+    /** カメラの焦点距離（ピクセル単位） */
+    focalLength: number;
+    /** 画像の幅（ピクセル） */
+    imageWidth: number;
+    /** 画像の高さ（ピクセル） */
+    imageHeight: number;
+    /** 物体クラス名（必須） */
+    className: string;
+    /** Z軸傾き推定を有効にする */
+    enableOrientationEstimation?: boolean;
+  };
+  /** 連続検出モードを有効にする（検出後もポーズしない） */
+  continuousDetection?: boolean;
 }
 
 /**
