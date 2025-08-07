@@ -47,14 +47,18 @@ example/
 ├── README.md                    # このファイル
 ├── object-detection-2d.html     # 2D検出デモ
 ├── object-detection-3d.html     # 3D検出デモ
-└── style.css                    # 共通スタイル
+├── style.css                    # 共通スタイル
+└── models/                      # YOLOモデルファイル
+    ├── model.json
+    ├── metadata.yaml
+    └── group1-shard*.bin
 ```
 
 ## 注意事項
 
 - HTTPS または localhost でのアクセスが必要（カメラアクセスのため）
 - 検出対象の物体サイズを事前に登録すると 3D 推定の精度が向上します
-- モデルファイル（models/）が必要です
+- モデルファイル（example/models/）が必要です
 
 ## API 使用例
 
@@ -64,8 +68,8 @@ example/
 import * as MitsukeLive from "../dist/index.js";
 
 const detector = new MitsukeLive.DetectionController({
-  modelPath: "../models/model.json",
-  metadataPath: "../models/metadata.yaml",
+  modelPath: "models/model.json",
+  metadataPath: "models/metadata.yaml",
   onDetection: (detection) => {
     console.log("検出:", detection);
   },
@@ -83,8 +87,8 @@ import * as MitsukeLive from "../dist/index.js";
 MitsukeLive.setObjectSize("icon", 0.091, 0.055); // 91mm x 55mm
 
 const detector = new MitsukeLive.DetectionController({
-  modelPath: "../models/model.json",
-  metadataPath: "../models/metadata.yaml",
+  modelPath: "models/model.json",
+  metadataPath: "models/metadata.yaml",
   onDetection: (detection) => {
     // 3D情報を追加
     const enhanced3D = MitsukeLive.add3DToDetection(detection, {

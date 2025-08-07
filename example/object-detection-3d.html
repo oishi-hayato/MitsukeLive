@@ -29,8 +29,8 @@
       };
 
       const DETECTOR_CONFIG = {
-        modelPath: "../models/model.json",
-        metadataPath: "../models/metadata.yaml",
+        modelPath: "models/model.json",
+        metadataPath: "models/metadata.yaml",
       };
 
       const THREED_CONFIG = {
@@ -65,7 +65,7 @@
           let scene = null;
           let camera = null;
           let renderer = null;
-          let cube = null;
+          let cubes = []; // 複数のオブジェクトを管理
           let animationId = null;
 
           // Three.jsシーンの初期化
@@ -104,15 +104,57 @@
             );
             camera.position.z = 0; // カメラを原点に配置
 
-            // キューブ作成（大きくして見えやすく）
-            const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2); // 20cm x 20cm x 20cm
-            const material = new THREE.MeshBasicMaterial({
-              color: 0x00ff88,
-              wireframe: true,
+            // 複数のキューブを作成（中心のオブジェクト周りに配置）
+            const cubeConfigs = [
+              {
+                color: 0x00ff88,
+                offsetX: 0,
+                offsetY: 0,
+                offsetZ: 0,
+                name: "center",
+              }, // 中心
+              {
+                color: 0xff0088,
+                offsetX: 0.3,
+                offsetY: 0,
+                offsetZ: 0,
+                name: "right",
+              }, // 右
+              {
+                color: 0x0088ff,
+                offsetX: -0.3,
+                offsetY: 0,
+                offsetZ: 0,
+                name: "left",
+              }, // 左
+              {
+                color: 0xffff00,
+                offsetX: 0,
+                offsetY: 0.3,
+                offsetZ: 0,
+                name: "top",
+              }, // 上
+              {
+                color: 0xff8800,
+                offsetX: 0,
+                offsetY: -0.3,
+                offsetZ: 0,
+                name: "bottom",
+              }, // 下
+            ];
+
+            cubeConfigs.forEach((config, index) => {
+              const geometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+              const material = new THREE.MeshBasicMaterial({
+                color: config.color,
+                wireframe: true,
+              });
+              const cube = new THREE.Mesh(geometry, material);
+              cube.visible = false;
+              cube.userData = { ...config, index };
+              cubes.push(cube);
+              scene.add(cube);
             });
-            cube = new THREE.Mesh(geometry, material);
-            cube.visible = false; // 初期は非表示
-            scene.add(cube);
 
             // ライト追加
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -126,112 +168,99 @@
           const animate = () => {
             animationId = requestAnimationFrame(animate);
 
-            if (cube && cube.visible) {
-              cube.rotation.x += 0.01;
-              cube.rotation.y += 0.01;
-            }
+            // 表示中のキューブを回転
+            cubes.forEach((cube) => {
+              if (cube.visible) {
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.01;
+              }
+            });
 
             if (renderer && scene && camera) {
               renderer.render(scene, camera);
             }
           };
 
-          // 3Dオブジェクトの位置を更新
+          // 3Dオブジェクトの位置を更新（相対配置システムを使用）
           const update3DObject = (detection) => {
-            if (!cube || !camera || !renderer) return;
+            if (cubes.length === 0 || !camera || !renderer) return;
 
-            // client-flashと完全に同じ座標計算を再現
             const [x, y, width, height] = detection.boundingBox;
-
             console.log("Detection box:", [x, y, width, height]);
-
-            // client-flashの処理：
-            // ctx.translate(x, y) → (x,y)位置に移動
-            // ctx.strokeRect(-w/2, -h/2, w, h) → その位置を中心に矩形描画
-            // つまり(x,y)が矩形の実際の中心座標
-            const centerX = x;
-            const centerY = y;
-
-            console.log("Flash center (same as translate point):", [centerX, centerY]);
 
             // キャンバスサイズを取得
             const detectionCanvas2 = document.getElementById("canvas");
             const canvasWidth = detectionCanvas2.width;
             const canvasHeight = detectionCanvas2.height;
 
-            console.log("Canvas size:", [canvasWidth, canvasHeight]);
+            // 基本の位置計算オプション
+            const baseOptions = {
+              camera: camera,
+              canvasWidth: canvasWidth,
+              canvasHeight: canvasHeight,
+              minDepth: 2.0,
+            };
 
-            // Three.jsでは画面座標からワールド座標への変換が必要
-            // より正確な方法：ワールド座標をピクセル座標で直接計算
-            
-            // カメラとレンダラーの設定から逆算
-            const vector = new THREE.Vector3();
-            
-            // キャンバス座標系をThree.jsの正規化デバイス座標に変換
-            vector.x = (centerX / canvasWidth) * 2 - 1;
-            vector.y = -(centerY / canvasHeight) * 2 + 1; // Y軸反転
-            vector.z = 0.5; // 中間の深度値
-            
-            // 正規化デバイス座標からワールド座標に変換
-            vector.unproject(camera);
-            
-            // 深度を使用してZ位置を設定
-            const depth = detection.depth || 1.0;
-            const targetZ = -Math.max(2, depth);
-            
-            // カメラからオブジェクトへの方向ベクトル
-            const direction = vector.sub(camera.position).normalize();
-            
-            // 指定されたZ位置でのワールド座標を計算
-            const distance = Math.abs(targetZ - camera.position.z);
-            cube.position.copy(camera.position).add(direction.multiplyScalar(distance));
-            cube.position.z = targetZ;
+            // 各キューブの相対位置を設定
+            cubes.forEach((cube, index) => {
+              const config = cube.userData;
 
-            console.log("Screen coordinates:", [centerX, centerY]);
-            console.log("World coordinates:", cube.position);
-
-            // 深度とバウンディングボックスサイズに応じてオブジェクトサイズを調整
-            const detectionCanvas = document.getElementById("canvas");
-            const boxSizeRatio = Math.sqrt(
-              (width * height) /
-                (detectionCanvas.width * detectionCanvas.height)
-            ); // バウンディングボックスの画面占有率
-
-            // 深度とバウンディングボックスサイズを組み合わせてスケール計算
-            const depthScale = Math.max(0.5, Math.min(3.0, 1.0 / depth)); // 深度スケール（基準値を大きく）
-            const sizeScale = boxSizeRatio * depthScale * 2.0; // 最終スケール（基準値を2倍に）
-            const finalScale = Math.max(0.1, Math.min(2.5, sizeScale)); // 範囲制限（最小・最大値を拡大）
-
-            cube.scale.set(finalScale, finalScale, finalScale);
-
-            console.log("Box size ratio:", boxSizeRatio);
-            console.log("Depth scale:", depthScale);
-            console.log("Final scale:", finalScale);
-
-            console.log("Cube position:", cube.position);
-
-            // 滑らかな表示アニメーション
-            if (!cube.visible) {
-              cube.visible = true;
-              // 小さくスタートして拡大するアニメーション
-              cube.scale.set(finalScale * 0.1, finalScale * 0.1, finalScale * 0.1);
-              const targetScale = finalScale;
-              const animateScale = () => {
-                const currentScale = cube.scale.x;
-                if (currentScale < targetScale * 0.95) {
-                  const newScale = currentScale * 1.1;
-                  cube.scale.set(newScale, newScale, newScale);
-                  requestAnimationFrame(animateScale);
-                } else {
-                  cube.scale.set(targetScale, targetScale, targetScale);
+              // 相対配置システムを使用して位置を計算
+              const relativePosition = MitsukeLive.calculateRelativePosition(
+                detection,
+                {
+                  ...baseOptions,
+                  offsetX: config.offsetX,
+                  offsetY: config.offsetY,
+                  offsetZ: config.offsetZ,
                 }
-              };
-              animateScale();
-            } else {
-              // 既に表示されている場合は単純にスケールを設定
-              cube.scale.set(finalScale, finalScale, finalScale);
-              cube.visible = true;
-            }
+              );
+
+              cube.position.set(
+                relativePosition.x,
+                relativePosition.y,
+                relativePosition.z
+              );
+
+              // スケール計算
+              const baseScale = index === 0 ? 1.5 : 1.0; // 中心は少し大きく
+              const finalScale = MitsukeLive.calculate3DScale(
+                detection,
+                canvasWidth,
+                canvasHeight,
+                baseScale
+              );
+
+              console.log(`${config.name} cube position:`, cube.position);
+
+              // 滑らかな表示アニメーション
+              if (!cube.visible) {
+                cube.visible = true;
+                // 小さくスタートして拡大するアニメーション（時間差をつける）
+                setTimeout(() => {
+                  cube.scale.set(
+                    finalScale * 0.1,
+                    finalScale * 0.1,
+                    finalScale * 0.1
+                  );
+                  const targetScale = finalScale;
+                  const animateScale = () => {
+                    const currentScale = cube.scale.x;
+                    if (currentScale < targetScale * 0.95) {
+                      const newScale = currentScale * 1.1;
+                      cube.scale.set(newScale, newScale, newScale);
+                      requestAnimationFrame(animateScale);
+                    } else {
+                      cube.scale.set(targetScale, targetScale, targetScale);
+                    }
+                  };
+                  animateScale();
+                }, index * 100); // 100ms間隔で順次表示
+              } else {
+                // 既に表示されている場合は単純にスケールを設定
+                cube.scale.set(finalScale, finalScale, finalScale);
+              }
+            });
           };
 
           // 検出情報をフォーマット
@@ -255,9 +284,9 @@
             } else {
               // 検出できなかった場合は情報と3Dオブジェクトを非表示
               state.detectionInfo.value = null;
-              if (cube) {
+              cubes.forEach((cube) => {
                 cube.visible = false;
-              }
+              });
             }
 
             // 連続検出モードでは検出状態を継続
@@ -313,9 +342,9 @@
               state.isDetecting.value = false;
               state.status.value = MESSAGES.PAUSED;
               state.detectionInfo.value = null;
-              if (cube) {
+              cubes.forEach((cube) => {
                 cube.visible = false;
-              }
+              });
             } else {
               detector.resume();
               state.isDetecting.value = true;
@@ -365,7 +394,7 @@
             </div>
 
             <div class="info-panel" v-if="detectionInfo">
-              <div class="info-header">検出情報 (AR表示中)</div>
+              <div class="info-header">検出情報 (相対配置AR表示中)</div>
               <div class="detection-info">
                 <div class="info-item">
                   <span class="label">信頼度:</span>

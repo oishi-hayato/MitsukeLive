@@ -10,6 +10,15 @@ export {
   setObjectSize,
   type ThreeDEstimationOptions,
 } from "./helpers/3d-estimator";
+export {
+  calculate3DPosition,
+  calculate3DScale,
+  calculateRelativePosition,
+  calculateMultipleRelativePositions,
+  type Position3DOptions,
+  type Position3D,
+  type RelativePositionOptions,
+} from "./helpers/3d-position-calculator";
 
 import { DetectionController } from "./lib/detection-controller";
 import type { ObjectDetectorOptions } from "./types";
