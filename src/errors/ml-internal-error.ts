@@ -9,13 +9,13 @@ export class MLInternalError extends Error {
   public readonly fatal: boolean;
 
   constructor(
-    code: keyof typeof ERROR_MESSAGES,
+    key: keyof typeof ERROR_MESSAGES,
     fatal: boolean = true,
     error?: Error
   ) {
-    const message = ERROR_MESSAGES[code];
+    const message = ERROR_MESSAGES[key];
     super(message, { cause: error });
-    this.code = code;
+    this.code = key;
     this.fatal = fatal;
     this.name = "MLInternalError";
   }
