@@ -84,22 +84,23 @@ await detector.initialize("video", "canvas");
 import * as MitsukeLive from "../dist/index.js";
 
 // 物体サイズを登録
-MitsukeLive.setObjectSize("icon", 0.091, 0.055); // 91mm x 55mm
+MitsukeLive.setObjectSize(0.091, 0.055); // 91mm x 55mm
 
 const detector = new MitsukeLive.DetectionController({
-  modelPath: "models/model.json",
-  metadataPath: "models/metadata.yaml",
-  onDetection: (detection) => {
-    // 3D情報を追加
-    const enhanced3D = MitsukeLive.add3DToDetection(detection, {
-      focalLength: 500,
-      imageWidth: 640,
-      imageHeight: 640,
-      className: "icon",
-      enableOrientationEstimation: true,
-    });
-
-    console.log("3D検出:", enhanced3D);
+  model: {
+    modelPath: "models/model.json",
+    metadataPath: "models/metadata.yaml",
+  },
+  threeDEstimation: {
+    objectSize: {
+      width: 0.02, // 2cm
+      height: 0.02, // 2cm
+    },
+  },
+  callbacks: {
+    onDetection: (detection) => {
+      console.log("3D検出:", detection);
+    },
   },
 });
 

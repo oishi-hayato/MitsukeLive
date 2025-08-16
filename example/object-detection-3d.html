@@ -29,16 +29,16 @@
       };
 
       const DETECTOR_CONFIG = {
-        modelPath: "models/model.json",
-        metadataPath: "models/metadata.yaml",
-      };
-
-      const THREED_CONFIG = {
-        focalLength: 500,
-        imageWidth: 640,
-        imageHeight: 640,
-        className: "icon",
-        enableOrientationEstimation: true,
+        model: {
+          modelPath: "models/model.json",
+          metadataPath: "models/metadata.yaml",
+        },
+        threeDEstimation: {
+          objectSize: {
+            width: 0.02, // 2cm
+            height: 0.02, // 2cm
+          },
+        },
       };
 
       const MESSAGES = {
@@ -304,24 +304,26 @@
               }
 
               // 3D推定用の物体サイズを登録
-              MitsukeLive.setObjectSize("icon", 0.02, 0.02); // 2cm x 2cm (4cm²)
+              MitsukeLive.setObjectSize(0.02, 0.02); // 2cm x 2cm (4cm²)
 
               const options = {
                 ...DETECTOR_CONFIG,
-                enable3D: true,
-                threeDOptions: THREED_CONFIG,
-                continuousDetection: true,
-                onCameraReady: () => {
-                  state.status.value = MESSAGES.READY;
-                  // カメラ準備完了後にThree.jsを初期化
-                  setTimeout(() => {
-                    initThreeJS();
-                    animate();
-                  }, 500);
+                detection: {
+                  continuousDetection: true,
                 },
-                onDetection: handleDetection,
-                onCameraNotAllowed: () => {
-                  state.error.value = MESSAGES.CAMERA_DENIED;
+                callbacks: {
+                  onCameraReady: () => {
+                    state.status.value = MESSAGES.READY;
+                    // カメラ準備完了後にThree.jsを初期化
+                    setTimeout(() => {
+                      initThreeJS();
+                      animate();
+                    }, 500);
+                  },
+                  onDetection: handleDetection,
+                  onCameraNotAllowed: () => {
+                    state.error.value = MESSAGES.CAMERA_DENIED;
+                  },
                 },
               };
 

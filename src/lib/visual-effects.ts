@@ -1,9 +1,9 @@
 import type { Detection } from "../types";
 
 /**
- * クライアント側で使用する点滅描画の設定オプション
+ * 視覚エフェクトの設定オプション
  */
-export interface ClientFlashOptions {
+export interface VisualEffectOptions {
   /** 点滅の間隔（ミリ秒）。デフォルト: 500ms */
   interval?: number;
   /** 点滅の持続時間（ミリ秒）。デフォルト: 2000ms（countが指定されている場合は無視される） */
@@ -17,17 +17,17 @@ export interface ClientFlashOptions {
 }
 
 /**
- * クライアント用：キャンバス上に検出枠の点滅エフェクトを描画します
+ * キャンバス上に検出枠の点滅エフェクトを描画します
  *
  * @param canvas - 描画対象のキャンバス要素
  * @param detection - 検出結果
  * @param options - 点滅設定オプション
  * @returns 点滅完了時に解決されるPromise
  */
-export function startClientFlashEffect(
+export function startFlashEffect(
   canvas: HTMLCanvasElement,
   detection: Detection,
-  options: ClientFlashOptions = {}
+  options: VisualEffectOptions = {}
 ): Promise<void> {
   const {
     interval = 500,

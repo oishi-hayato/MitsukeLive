@@ -28,8 +28,10 @@
       };
 
       const DETECTOR_CONFIG = {
-        modelPath: "models/model.json",
-        metadataPath: "models/metadata.yaml",
+        model: {
+          modelPath: "models/model.json",
+          metadataPath: "models/metadata.yaml",
+        },
       };
 
       const MESSAGES = {
@@ -69,7 +71,7 @@
               state.detectionInfo.value = formatDetectionInfo(detection);
 
               // 点滅エフェクト
-              await MitsukeLive.startClientFlashEffect(
+              await MitsukeLive.startFlashEffect(
                 document.getElementById("canvas"),
                 detection,
                 FLASH_CONFIG

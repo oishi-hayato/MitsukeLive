@@ -18,11 +18,7 @@ const RADIANS_TO_DEGREES = 180 / Math.PI;
  */
 export function convertRadiansToDegrees(radians: number): number {
   if (!Number.isFinite(radians)) {
-    throw new MLInternalError(
-      "ラジアン値が不正です",
-      "INVALID_RADIAN_VALUE",
-      false // 非致命的 - デフォルト値で継続可能
-    );
+    throw new MLInternalError("INVALID_RADIAN_VALUE", false);
   }
 
   return radians * RADIANS_TO_DEGREES;
@@ -44,10 +40,7 @@ export function calculateOptimalScale(
   targetHeight: number = 640
 ): { scaleRatio: number; scaledWidth: number; scaledHeight: number } {
   if (originalWidth <= 0 || originalHeight <= 0) {
-    throw new MLInternalError(
-      "画像サイズに無効な値が指定されています",
-      "INVALID_DIMENSIONS"
-    );
+    throw new MLInternalError("INVALID_IMAGE_DIMENSIONS");
   }
 
   const scaleRatio = Math.min(
@@ -81,10 +74,7 @@ export function calculatePadding(
   paddingList: PaddingList;
 } {
   if (scaledWidth > letterboxWidth || scaledHeight > letterboxHeight) {
-    throw new MLInternalError(
-      "リサイズ後の画像が目標サイズを超えています",
-      "SCALED_SIZE_EXCEEDS_TARGET"
-    );
+    throw new MLInternalError("RESIZED_IMAGE_EXCEEDS_TARGET");
   }
 
   const paddingWidth = letterboxWidth - scaledWidth;
@@ -116,19 +106,13 @@ export function letterboxTransform(
 ): { output: tf.Tensor3D; letterboxInfo: LetterboxInfo } {
   // 入力検証: 3次元テンソルかどうか
   if (image.shape.length !== 3) {
-    throw new MLInternalError(
-      "入力画像は3次元テンソルである必要があります",
-      "INVALID_TENSOR_SHAPE"
-    );
+    throw new MLInternalError("INPUT_MUST_BE_3D_TENSOR");
   }
 
   // 入力検証: 目標サイズが正の値かどうか
   const [letterboxHeight, letterboxWidth] = letterboxShape;
   if (letterboxWidth <= 0 || letterboxHeight <= 0) {
-    throw new MLInternalError(
-      "目標画像サイズが不正です",
-      "INVALID_TARGET_DIMENSIONS"
-    );
+    throw new MLInternalError("INVALID_TARGET_IMAGE_SIZE");
   }
 
   const [originalHeight, originalWidth] = image.shape;
@@ -200,36 +184,20 @@ export function letterboxToOriginal(
     !Number.isFinite(width) ||
     !Number.isFinite(height)
   ) {
-    throw new MLInternalError(
-      "座標値に不正な値が含まれています",
-      "INVALID_COORDINATE_VALUE",
-      false
-    );
+    throw new MLInternalError("INVALID_COORDINATE_VALUES", false);
   }
 
   if (!Number.isFinite(scale) || scale <= 0) {
-    throw new MLInternalError(
-      "スケール値が不正です",
-      "INVALID_SCALE_VALUE",
-      false
-    );
+    throw new MLInternalError("INVALID_SCALE_VALUE", false);
   }
 
   if (!Number.isFinite(top) || !Number.isFinite(left)) {
-    throw new MLInternalError(
-      "パディング値に不正な値が含まれています",
-      "INVALID_PADDING_VALUE",
-      false
-    );
+    throw new MLInternalError("INVALID_PADDING_VALUES", false);
   }
 
   // 幅と高さが負の値の場合はエラー
   if (width < 0 || height < 0) {
-    throw new MLInternalError(
-      "幅または高さに負の値が指定されています",
-      "INVALID_DIMENSIONS",
-      false
-    );
+    throw new MLInternalError("NEGATIVE_WIDTH_OR_HEIGHT", false);
   }
 
   return {
@@ -260,47 +228,27 @@ export function originalToCanvas(
     !Number.isFinite(rect.width) ||
     !Number.isFinite(rect.height)
   ) {
-    throw new MLInternalError(
-      "座標値に不正な値が含まれています",
-      "INVALID_COORDINATE_VALUE",
-      false
-    );
+    throw new MLInternalError("INVALID_COORDINATE_VALUES", false);
   }
 
   if (
     !Number.isFinite(croppedSize.width) ||
     !Number.isFinite(croppedSize.height)
   ) {
-    throw new MLInternalError(
-      "クロップ領域サイズに不正な値が含まれています",
-      "INVALID_CROPPED_REGION_SIZE",
-      false
-    );
+    throw new MLInternalError("INVALID_CROPPED_REGION_SIZE", false);
   }
 
   if (croppedSize.width <= 0 || croppedSize.height <= 0) {
-    throw new MLInternalError(
-      "クロップ領域サイズは正の値で指定してください",
-      "INVALID_CROPPED_REGION_SIZE",
-      false
-    );
+    throw new MLInternalError("CROPPED_REGION_MUST_BE_POSITIVE", false);
   }
 
   if (canvasElement.width <= 0 || canvasElement.height <= 0) {
-    throw new MLInternalError(
-      "キャンバスサイズが不正です",
-      "INVALID_CANVAS_SIZE",
-      false
-    );
+    throw new MLInternalError("INVALID_CANVAS_SIZE", false);
   }
 
   // 幅と高さが負の値の場合はエラー
   if (rect.width < 0 || rect.height < 0) {
-    throw new MLInternalError(
-      "幅または高さに負の値が指定されています",
-      "INVALID_DIMENSIONS",
-      false
-    );
+    throw new MLInternalError("NEGATIVE_WIDTH_OR_HEIGHT", false);
   }
 
   // クロップ領域からキャンバスへのアスペクト比維持スケール計算
@@ -335,10 +283,7 @@ export function transformToCanvas(
   }
 
   if (!canvasElement || canvasElement.width <= 0 || canvasElement.height <= 0) {
-    throw new MLInternalError(
-      "キャンバスサイズが不正です",
-      "INVALID_CANVAS_SIZE"
-    );
+    throw new MLInternalError("INVALID_CANVAS_SIZE");
   }
 
   const { scale, top, left, croppedWidth, croppedHeight } = letterboxInfo;
@@ -354,10 +299,7 @@ export function transformToCanvas(
     croppedWidth <= 0 ||
     croppedHeight <= 0
   ) {
-    throw new MLInternalError(
-      "レターボックス情報が不正です",
-      "INVALID_LETTERBOX_INFO"
-    );
+    throw new MLInternalError("INVALID_LETTERBOX_INFO");
   }
 
   // フィルタリングと変換を同時に実行（無効な項目をスキップ）

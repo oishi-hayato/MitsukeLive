@@ -44,10 +44,7 @@ export class YOLOInference {
     canvasElement?: HTMLCanvasElement
   ): Promise<Detection[]> {
     if (!this.model) {
-      throw new MLInternalError(
-        "モデルが初期化されていません",
-        "MODEL_NOT_INITIALIZED"
-      );
+      throw new MLInternalError("MODEL_NOT_INITIALIZED");
     }
 
     const results = this.model.predict(imageTensor) as tf.Tensor;
@@ -62,7 +59,6 @@ export class YOLOInference {
           canvasElement
         );
       }
-
 
       this.logMemoryUsage();
       return predictions;
@@ -104,10 +100,7 @@ export class YOLOInference {
       const text = await response.text();
       this.metadata = load(text) as YOLOMetadata;
     } catch (error: unknown) {
-      throw new MLInternalError(
-        "メタデータの読み込みに失敗しました",
-        "METADATA_LOAD_ERROR"
-      );
+      throw new MLInternalError("FAILED_TO_LOAD_METADATA");
     }
   }
 
@@ -118,10 +111,7 @@ export class YOLOInference {
     try {
       this.model = await tf.loadGraphModel(this.options.modelPath);
     } catch (error: unknown) {
-      throw new MLInternalError(
-        "モデルの読み込みに失敗しました",
-        "MODEL_LOAD_ERROR"
-      );
+      throw new MLInternalError("FAILED_TO_LOAD_MODEL");
     }
   }
 
