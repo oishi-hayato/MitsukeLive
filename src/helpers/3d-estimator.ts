@@ -181,8 +181,6 @@ export function add3DToDetection(
       orientation: threeDInfo.orientation,
     };
   } catch (error) {
-    // 3D推定に失敗した場合は元の検出結果をそのまま返す
-    console.warn(`[3DEstimator] 3D推定に失敗しました:`, error);
     return detection;
   }
 }

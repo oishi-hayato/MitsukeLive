@@ -15,7 +15,7 @@ export default defineConfig({
         manualChunks: {
           tensorflow: ["@tensorflow/tfjs"],
           yaml: ["js-yaml"],
-          core: [
+          inference: [
             "src/lib/detection-controller.ts",
             "src/lib/yolo-inference.ts",
           ],

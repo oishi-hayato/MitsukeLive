@@ -1,11 +1,13 @@
 import type { Detection } from "../types";
+import * as THREE from "three";
+
 
 /**
  * 3D位置計算のオプション
  */
 export interface Position3DOptions {
   /** Three.jsのカメラオブジェクト */
-  camera: any; // THREE.Camera型だが、Three.jsに依存しないようにanyを使用
+  camera: THREE.Camera;
   /** キャンバスの幅 */
   canvasWidth: number;
   /** キャンバスの高さ */
@@ -57,14 +59,6 @@ export function calculate3DPosition(
   // client-flashと同じ座標計算（translateの位置が実際の中心）
   const centerX = x;
   const centerY = y;
-
-  // Three.jsのVector3を使用（動的にインポート）
-  const THREE = (globalThis as any).THREE;
-  if (!THREE) {
-    throw new Error(
-      "Three.js is required for 3D position calculation. Please include Three.js before using this function."
-    );
-  }
 
   const vector = new THREE.Vector3();
 
@@ -145,14 +139,6 @@ export function calculateRelativePosition(
 
   // まず検出オブジェクトの中心位置を計算
   const centerPosition = calculate3DPosition(detection, options);
-
-  // Three.jsのVector3を使用（動的にインポート）
-  const THREE = (globalThis as any).THREE;
-  if (!THREE) {
-    throw new Error(
-      "Three.js is required for relative position calculation. Please include Three.js before using this function."
-    );
-  }
 
   // 検出オブジェクトの中心を原点として、相対オフセットを適用
   const relativePosition = new THREE.Vector3(

@@ -148,6 +148,7 @@
               const material = new THREE.MeshBasicMaterial({
                 color: config.color,
                 wireframe: true,
+                wireframeLinewidth: 5,
               });
               const cube = new THREE.Mesh(geometry, material);
               cube.visible = false;
