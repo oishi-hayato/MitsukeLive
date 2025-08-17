@@ -12,8 +12,13 @@ body {
   overflow: hidden;
 }
 
+/* Monospace font family for numeric/technical content */
+.monospace {
+  font-family: "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono", monospace;
+}
+
 /* メインアプリケーション */
-.detection-app {
+.app {
   position: relative;
   width: 100vw;
   height: 100vh;
@@ -21,14 +26,14 @@ body {
 }
 
 /* カメラコンテナ */
-.camera-container {
+.camera {
   position: relative;
   width: 100%;
   height: 100%;
 }
 
-.camera-video,
-.camera-canvas {
+.camera__video,
+.camera__canvas {
   position: absolute;
   top: 0;
   left: 0;
@@ -36,12 +41,12 @@ body {
   height: 100%;
 }
 
-.camera-video {
+.camera__video {
   object-fit: cover;
   z-index: 1;
 }
 
-.camera-canvas {
+.camera__canvas {
   z-index: 10;
   pointer-events: none;
 }
@@ -64,7 +69,7 @@ body {
 }
 
 /* 情報パネル */
-.info-panel {
+.info {
   position: absolute;
   bottom: 20px;
   left: 20px;
@@ -80,43 +85,39 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.info-header {
+.info__header {
   font-weight: bold;
   margin-bottom: 10px;
 }
 
-.detection-info {
+.info__detection {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
-.info-item {
+.info__item {
   display: flex;
   align-items: center;
   padding: 4px 0;
 }
 
-.info-item .label {
+.info__label {
   flex: 0 0 auto;
   margin-right: 20px;
-}
-
-.info-item .label {
   color: #ccc;
   font-size: 13px;
 }
 
-.info-item .value {
+.info__value {
   flex: 1 1 auto;
   text-align: right;
   color: #fff;
   font-weight: 500;
-  font-family: "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono", monospace;
 }
 
 @media (max-width: 480px) {
-  .detection-info {
+  .info__detection {
     grid-template-columns: 1fr;
     gap: 6px;
   }
@@ -143,7 +144,7 @@ body {
   flex-direction: column;
 }
 
-.control-btn {
+.controls__btn {
   background: rgba(0, 0, 0, 0.7);
   color: white;
   border: none;
@@ -162,17 +163,17 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.control-btn:hover {
+.controls__btn:hover {
   background: rgba(0, 0, 0, 0.9);
   transform: scale(1.05);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
-.control-btn:active {
+.controls__btn:active {
   transform: scale(0.95);
 }
 
-.control-btn:disabled {
+.controls__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
@@ -200,18 +201,18 @@ body {
   }
 }
 
-.fade-in {
+.fade--in {
   animation: fadeIn 0.3s ease-out;
 }
 
-.fade-out {
+.fade--out {
   animation: fadeOut 0.3s ease-out;
 }
 
 /* レスポンシブ対応 */
 @media (max-width: 480px) {
   .message,
-  .info-panel {
+  .info {
     left: 10px;
     right: 10px;
     padding: 12px;
@@ -222,7 +223,7 @@ body {
     right: 10px;
   }
 
-  .control-btn {
+  .controls__btn {
     width: 40px;
     height: 40px;
     font-size: 16px;
@@ -236,7 +237,6 @@ body {
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
-  font-family: monospace;
   font-size: 12px;
   font-weight: bold;
   pointer-events: none;

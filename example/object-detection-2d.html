@@ -27,11 +27,9 @@
         lineWidth: 3,
       };
 
-      const DETECTOR_CONFIG = {
-        model: {
-          modelPath: "models/model.json",
-          metadataPath: "models/metadata.yaml",
-        },
+      const MODEL_PATHS = {
+        modelPath: "models/model.json",
+        metadataPath: "models/metadata.yaml",
       };
 
       const MESSAGES = {
@@ -94,7 +92,6 @@
               }
 
               const options = {
-                ...DETECTOR_CONFIG,
                 onCameraReady: () => {
                   state.status.value = MESSAGES.READY;
                 },
@@ -104,7 +101,11 @@
                 },
               };
 
-              detector = new MitsukeLive.DetectionController(options);
+              detector = new MitsukeLive.DetectionController(
+                MODEL_PATHS.modelPath,
+                MODEL_PATHS.metadataPath,
+                options
+              );
               await detector.initialize("video", "canvas");
               state.isDetecting.value = true;
             } catch (err) {
@@ -144,10 +145,10 @@
         },
 
         template: `
-          <div class="detection-app">
-            <div class="camera-container">
-              <video id="video" class="camera-video" autoplay muted playsinline></video>
-              <canvas id="canvas" class="camera-canvas"></canvas>
+          <div class="app">
+            <div class="camera">
+              <video id="video" class="camera__video" autoplay muted playsinline></video>
+              <canvas id="canvas" class="camera__canvas"></canvas>
             </div>
 
             <div class="message">
@@ -157,25 +158,25 @@
             </div>
 
             <div class="controls">
-              <button 
-                class="control-btn" 
-                @click="toggleDetection" 
+              <button
+                class="controls__btn"
+                @click="toggleDetection"
                 :title="isDetecting ? '検出停止' : '検出開始'"
               >
                 <i :class="isDetecting ? 'mdi mdi-pause' : 'mdi mdi-play'"></i>
               </button>
             </div>
 
-            <div class="info-panel" v-if="detectionInfo">
-              <div class="info-header">検出情報</div>
-              <div class="detection-info">
-                <div class="info-item">
-                  <span class="label">信頼度:</span>
-                  <span class="value">{{ detectionInfo.score }}%</span>
+            <div class="info" v-if="detectionInfo">
+              <div class="info__header">検出情報</div>
+              <div class="info__detection">
+                <div class="info__item">
+                  <span class="info__label">信頼度:</span>
+                  <span class="info__value monospace">{{ detectionInfo.score }}%</span>
                 </div>
-                <div class="info-item">
-                  <span class="label">位置:</span>
-                  <span class="value">[{{ detectionInfo.box.join(', ') }}]</span>
+                <div class="info__item">
+                  <span class="info__label">位置:</span>
+                  <span class="info__value monospace">[{{ detectionInfo.box.join(', ') }}]</span>
                 </div>
               </div>
             </div>

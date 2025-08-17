@@ -1,6 +1,6 @@
 // 公開API
 export { DetectionController } from "./lib/detection-controller";
-export type { ObjectDetectorOptions, Detection } from "./types";
+export type { ObjectDetectorOptions, Detection, ARDetection } from "./types";
 export type { MLClientError } from "./errors";
 export {
   startFlashEffect,
@@ -20,9 +20,11 @@ import { MLClientError } from "./errors";
 export async function createDetector(
   videoElementId: string,
   canvasElementId: string,
-  options: ObjectDetectorOptions
+  modelPath: string,
+  metadataPath: string,
+  options: ObjectDetectorOptions = {}
 ): Promise<DetectionController> {
-  const detectionController = new DetectionController(options);
+  const detectionController = new DetectionController(modelPath, metadataPath, options);
 
   try {
     await detectionController.initialize(videoElementId, canvasElementId);

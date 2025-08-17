@@ -1,4 +1,4 @@
-import type { Detection } from "../types";
+import type { Detection, ARDetection } from "../types";
 
 /**
  * 視覚エフェクトの設定オプション
@@ -26,7 +26,7 @@ export interface VisualEffectOptions {
  */
 export function startFlashEffect(
   canvas: HTMLCanvasElement,
-  detection: Detection,
+  detection: Detection | ARDetection,
   options: VisualEffectOptions = {}
 ): Promise<void> {
   const {

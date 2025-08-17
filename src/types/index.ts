@@ -1,5 +1,5 @@
 /**
- * 物体検出結果を表すインターフェース
+ * 基本物体検出結果を表すインターフェース
  */
 export interface Detection {
   /** バウンディングボックス [x, y, width, height] */
@@ -8,10 +8,16 @@ export interface Detection {
   angle: number;
   /** 信頼度スコア（0.0-1.0） */
   score: number;
+}
+
+/**
+ * ARモード用の検出結果を表すインターフェース（3D情報付き）
+ */
+export interface ARDetection extends Detection {
   /** 推定Z軸座標（メートル単位、0に近いほど手前） */
-  depth?: number;
+  depth: number;
   /** Z軸回りの傾き角度（pitch: 上下傾き、roll: 左右傾き）度単位 */
-  orientation?: {
+  orientation: {
     pitch: number; // 上下傾き（-90～90度）
     roll: number; // 左右傾き（-180～180度）
   };
@@ -21,14 +27,6 @@ export interface Detection {
  * 物体検出器の設定オプション
  */
 export interface ObjectDetectorOptions {
-  /** モデル設定 */
-  model: {
-    /** TensorFlow.jsモデルファイルへのパス */
-    modelPath: string;
-    /** YOLOメタデータファイルへのパス */
-    metadataPath: string;
-  };
-
   /** 検出設定 */
   detection?: {
     /** 推論実行の間隔（ミリ秒）。デフォルト: 500ms */
@@ -50,15 +48,12 @@ export interface ObjectDetectorOptions {
     memoryThreshold?: number;
   };
 
-  /** コールバック */
-  callbacks?: {
-    /** 物体検出時に呼び出されるコールバック関数（検出できない場合はnull） */
-    onDetection?: (detection: Detection | null) => void;
-    /** カメラの初期化完了時に呼び出されるコールバック関数 */
-    onCameraReady?: () => void;
-    /** カメラアクセスが許可されていない時に呼び出されるコールバック関数 */
-    onCameraNotAllowed?: () => void;
-  };
+  /** 物体検出時に呼び出されるコールバック関数（検出できない場合はnull、3D推定有効時はARDetection） */
+  onDetection?: (detection: Detection | ARDetection | null) => void;
+  /** カメラの初期化完了時に呼び出されるコールバック関数 */
+  onCameraReady?: () => void;
+  /** カメラアクセスが許可されていない時に呼び出されるコールバック関数 */
+  onCameraNotAllowed?: () => void;
 }
 
 /**

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MitsukeLive - 3D物体検出デモ</title>
+    <title>MitsukeLive - ARモードデモ</title>
     <link rel="stylesheet" href="style.css" />
     <link
       rel="stylesheet"
@@ -28,11 +28,12 @@
         lineWidth: 3,
       };
 
-      const DETECTOR_CONFIG = {
-        model: {
-          modelPath: "models/model.json",
-          metadataPath: "models/metadata.yaml",
-        },
+      const MODEL_PATHS = {
+        modelPath: "models/model.json",
+        metadataPath: "models/metadata.yaml",
+      };
+
+      const DETECTOR_OPTIONS = {
         threeDEstimation: {
           objectSize: {
             width: 0.02, // 2cm
@@ -267,9 +268,9 @@
           // 検出情報をフォーマット
           const formatDetectionInfo = (detection) => ({
             score: (detection.score * 100).toFixed(1),
-            depth: detection.depth ? detection.depth.toFixed(3) : "N/A",
-            pitch: detection.orientation?.pitch?.toFixed(1) || "0",
-            roll: detection.orientation?.roll?.toFixed(1) || "0",
+            depth: detection.depth.toFixed(3),
+            pitch: detection.orientation.pitch.toFixed(1),
+            roll: detection.orientation.roll.toFixed(1),
             box: detection.boundingBox.map((v) => Math.round(v)),
           });
 
@@ -307,27 +308,29 @@
               MitsukeLive.setObjectSize(0.02, 0.02); // 2cm x 2cm (4cm²)
 
               const options = {
-                ...DETECTOR_CONFIG,
+                ...DETECTOR_OPTIONS,
                 detection: {
                   continuousDetection: true,
                 },
-                callbacks: {
-                  onCameraReady: () => {
-                    state.status.value = MESSAGES.READY;
-                    // カメラ準備完了後にThree.jsを初期化
-                    setTimeout(() => {
-                      initThreeJS();
-                      animate();
-                    }, 500);
-                  },
-                  onDetection: handleDetection,
-                  onCameraNotAllowed: () => {
-                    state.error.value = MESSAGES.CAMERA_DENIED;
-                  },
+                onCameraReady: () => {
+                  state.status.value = MESSAGES.READY;
+                  // カメラ準備完了後にThree.jsを初期化
+                  setTimeout(() => {
+                    initThreeJS();
+                    animate();
+                  }, 500);
+                },
+                onDetection: handleDetection,
+                onCameraNotAllowed: () => {
+                  state.error.value = MESSAGES.CAMERA_DENIED;
                 },
               };
 
-              detector = new MitsukeLive.DetectionController(options);
+              detector = new MitsukeLive.DetectionController(
+                MODEL_PATHS.modelPath,
+                MODEL_PATHS.metadataPath,
+                options
+              );
               await detector.initialize("video", "canvas");
               state.isDetecting.value = true;
             } catch (err) {
@@ -373,11 +376,11 @@
         },
 
         template: `
-          <div class="detection-app">
-            <div class="camera-container" style="position: relative;">
-              <video id="video" class="camera-video" autoplay muted playsinline></video>
-              <canvas id="canvas" class="camera-canvas"></canvas>
-              <canvas id="ar-canvas" class="camera-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+          <div class="app">
+            <div class="camera" style="position: relative;">
+              <video id="video" class="camera__video" autoplay muted playsinline></video>
+              <canvas id="canvas" class="camera__canvas"></canvas>
+              <canvas id="ar-canvas" class="camera__canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
             </div>
 
             <div class="message">
@@ -388,7 +391,7 @@
 
             <div class="controls">
               <button
-                class="control-btn"
+                class="controls__btn"
                 @click="toggleDetection"
                 :title="isDetecting ? '検出停止' : '検出開始'"
               >
@@ -396,28 +399,28 @@
               </button>
             </div>
 
-            <div class="info-panel" v-if="detectionInfo">
-              <div class="info-header">検出情報 (相対配置AR表示中)</div>
-              <div class="detection-info">
-                <div class="info-item">
-                  <span class="label">信頼度:</span>
-                  <span class="value">{{ detectionInfo.score }}%</span>
+            <div class="info" v-if="detectionInfo">
+              <div class="info__header">ARモード - 検出情報</div>
+              <div class="info__detection">
+                <div class="info__item">
+                  <span class="info__label">信頼度:</span>
+                  <span class="info__value monospace">{{ detectionInfo.score }}%</span>
                 </div>
-                <div class="info-item">
-                  <span class="label">深度:</span>
-                  <span class="value">{{ detectionInfo.depth }}m</span>
+                <div class="info__item">
+                  <span class="info__label">深度:</span>
+                  <span class="info__value monospace">{{ detectionInfo.depth }}m</span>
                 </div>
-                <div class="info-item">
-                  <span class="label">上下傾き:</span>
-                  <span class="value">{{ detectionInfo.pitch }}°</span>
+                <div class="info__item">
+                  <span class="info__label">上下傾き:</span>
+                  <span class="info__value monospace">{{ detectionInfo.pitch }}°</span>
                 </div>
-                <div class="info-item">
-                  <span class="label">左右傾き:</span>
-                  <span class="value">{{ detectionInfo.roll }}°</span>
+                <div class="info__item">
+                  <span class="info__label">左右傾き:</span>
+                  <span class="info__value monospace">{{ detectionInfo.roll }}°</span>
                 </div>
-                <div class="info-item">
-                  <span class="label">位置:</span>
-                  <span class="value">[{{ detectionInfo.box.join(', ') }}]</span>
+                <div class="info__item">
+                  <span class="info__label">位置:</span>
+                  <span class="info__value monospace">[{{ detectionInfo.box.join(', ') }}]</span>
                 </div>
               </div>
             </div>

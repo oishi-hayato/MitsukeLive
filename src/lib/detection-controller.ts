@@ -10,6 +10,7 @@ import { add3DToDetection } from "../helpers/3d-helper";
 import type {
   ObjectDetectorOptions,
   Detection,
+  ARDetection,
   LetterboxInfo,
   YOLOMetadata,
 } from "../types";
@@ -50,7 +51,7 @@ export class DetectionController {
   private lastVideoDimensions?: { width: number; height: number }; // 前回のビデオサイズ
   private lastCanvasDimensions?: { width: number; height: number }; // 前回のキャンバスサイズ
 
-  private onDetection: (detection: Detection | null) => void; // 検出結果コールバック
+  private onDetection: (detection: Detection | ARDetection | null) => void; // 検出結果コールバック
   private onCameraReady: () => void; // カメラ準備完了コールバック
   private onCameraNotAllowed: () => void; // カメラアクセス拒否コールバック
 
@@ -64,25 +65,30 @@ export class DetectionController {
 
   /**
    * コントローラーの初期設定
-   * @param options 物体検出の設定オプション（モデル、メタデータパス、推論間隔等）
+   * @param modelPath TensorFlow.jsモデルファイルへのパス
+   * @param metadataPath YOLOメタデータファイルへのパス
+   * @param options 物体検出の設定オプション（推論間隔等）
    */
-  constructor(options: ObjectDetectorOptions) {
+  constructor(
+    modelPath: string,
+    metadataPath: string,
+    options: ObjectDetectorOptions = {}
+  ) {
     this.detectionIntervalMs =
       options.detection?.inferenceInterval || DEFAULT_INFERENCE_INTERVAL_MS;
     this.backend = options.performance?.backend || DEFAULT_BACKEND;
 
     // YOLO設定
     this.yoloInference = new YOLOInference({
-      modelPath: options.model.modelPath,
-      metadataPath: options.model.metadataPath,
+      modelPath,
+      metadataPath,
       scoreThreshold: options.detection?.scoreThreshold,
       memoryThreshold: options.performance?.memoryThreshold,
     });
 
-    this.onDetection = options.callbacks?.onDetection || (() => {});
-    this.onCameraReady = options.callbacks?.onCameraReady || (() => {});
-    this.onCameraNotAllowed =
-      options.callbacks?.onCameraNotAllowed || (() => {});
+    this.onDetection = options.onDetection || (() => {});
+    this.onCameraReady = options.onCameraReady || (() => {});
+    this.onCameraNotAllowed = options.onCameraNotAllowed || (() => {});
 
     // 3D推定設定
     this.enable3D = !!options.threeDEstimation;

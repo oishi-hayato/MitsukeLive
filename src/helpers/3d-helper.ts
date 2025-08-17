@@ -1,4 +1,4 @@
-import type { Detection, ThreeDEstimationOptions } from "../types";
+import type { Detection, ARDetection, ThreeDEstimationOptions } from "../types";
 import { MLInternalError } from "../errors";
 
 /**
@@ -97,30 +97,26 @@ function estimateOrientation(
 }
 
 /**
- * 検出結果に3D情報を追加（プラスα処理）
+ * 検出結果に3D情報を追加してARDetectionに変換
  *
  * @param detection - 検出結果
  * @param options - 3D推定のオプション
- * @returns 3D情報が追加された検出結果
+ * @returns ARモード用の検出結果（3D情報付き）
  */
 export function add3DToDetection(
   detection: Detection,
   imageWidth: number,
   options: ThreeDEstimationOptions
-): Detection {
-  try {
-    const threeDInfo = estimate3DInfo(
-      detection.boundingBox,
-      imageWidth,
-      options
-    );
+): ARDetection {
+  const threeDInfo = estimate3DInfo(
+    detection.boundingBox,
+    imageWidth,
+    options
+  );
 
-    return {
-      ...detection,
-      depth: threeDInfo.depth,
-      orientation: threeDInfo.orientation,
-    };
-  } catch (error) {
-    return detection;
-  }
+  return {
+    ...detection,
+    depth: threeDInfo.depth,
+    orientation: threeDInfo.orientation || { pitch: 0, roll: 0 },
+  };
 }
