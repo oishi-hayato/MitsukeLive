@@ -24,7 +24,7 @@ npm run example
 Access http://localhost:3000 in your browser to view two demos:
 
 - [2d.html](http://localhost:3000/2d.html) - 2D
-- [ar.html](http://localhost:3000/ar.html) - 3D/AR
+- [3d.html](http://localhost:3000/3d.html) - 3D/AR
 
 ## Documentation
 
