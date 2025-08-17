@@ -16,7 +16,9 @@
           "options": {
             "syntax": "shorthand"
           }
-        }
+        },
+        "noInferrableTypes": "off",
+        "noUnnecessaryContinue": "off"
       },
       "suspicious": {
         "noExplicitAny": "warn"

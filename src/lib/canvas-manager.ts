@@ -24,27 +24,18 @@ export class CanvasManager {
     const element = document.getElementById(canvasElementId);
 
     if (!element) {
-      throw new MLInternalError(
-        `キャンバス要素が見つかりません: ${canvasElementId}`,
-        "CANVAS_ELEMENT_NOT_FOUND"
-      );
+      throw new MLInternalError("CANVAS_ELEMENT_NOT_FOUND");
     }
 
     if (!(element instanceof HTMLCanvasElement)) {
-      throw new MLInternalError(
-        `指定された要素はキャンバス要素ではありません: ${canvasElementId}`,
-        "ELEMENT_TYPE_MISMATCH"
-      );
+      throw new MLInternalError("NOT_A_CANVAS_ELEMENT");
     }
 
     const canvas = element;
 
     const context = canvas.getContext("2d");
     if (!context) {
-      throw new MLInternalError(
-        "2Dコンテキストの取得に失敗しました",
-        "CANVAS_CONTEXT_ERROR"
-      );
+      throw new MLInternalError("FAILED_TO_GET_2D_CONTEXT");
     }
 
     // キャンバスサイズ更新関数

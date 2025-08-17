@@ -1,11 +1,41 @@
+<p align="center">
+  <img src="assets/LOGO.png" alt="MitsukeLive Logo" width="300">
+</p>
+
 # MitsukeLive
 
-MitsukeLive は、TensorFlow.js と YOLO モデルを使用したリアルタイム物体検出ライブラリです。
+MitsukeLive is a real-time object detection library using TensorFlow.js and YOLO models.
 
-## 説明
+MitsukeLive provides two detection modes:
 
-※ 後日記載予定
+| Mode      | Features                                                                                       |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| **2D**    | Basic object detection<br>Pauses on detection to show results                                  |
+| **3D/AR** | Advanced object detection with 3D information<br>Continuous detection for real-time experience |
 
-## ライセンス
+## Example
 
-Apache License 2.0 - 詳細は[LICENSE](LICENSE)ファイルを参照してください。
+To start the demo application:
+
+```bash
+npm run example
+```
+
+Access http://localhost:3000 in your browser to view two demos:
+
+- [2d.html](http://localhost:3000/2d.html) - 2D
+- [3d.html](http://localhost:3000/3d.html) - 3D/AR
+
+## Documentation
+
+Coming soon
+
+## Partners
+
+This project is supported by the following partners:
+
+<a href="https://irdl.jp/"><img src="https://irdl.jp/img/irdl/logo.webp" alt="ITO REAL DESIGN Lab." width="300"></a>
+
+## License
+
+[Apache License 2.0](LICENSE)

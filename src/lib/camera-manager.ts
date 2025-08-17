@@ -22,17 +22,11 @@ export class CameraManager {
     const element = document.getElementById(videoElementId);
 
     if (!element) {
-      throw new MLInternalError(
-        `ビデオ要素が見つかりません: ${videoElementId}`,
-        "VIDEO_ELEMENT_NOT_FOUND"
-      );
+      throw new MLInternalError("VIDEO_ELEMENT_NOT_FOUND");
     }
 
     if (!(element instanceof HTMLVideoElement)) {
-      throw new MLInternalError(
-        `指定された要素はビデオ要素ではありません: ${videoElementId}`,
-        "ELEMENT_TYPE_MISMATCH"
-      );
+      throw new MLInternalError("NOT_A_VIDEO_ELEMENT");
     }
 
     const videoElement = element;

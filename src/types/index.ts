@@ -1,5 +1,5 @@
 /**
- * 物体検出結果を表すインターフェース
+ * 基本物体検出結果を表すインターフェース
  */
 export interface Detection {
   /** バウンディングボックス [x, y, width, height] */
@@ -11,23 +11,45 @@ export interface Detection {
 }
 
 /**
+ * ARモード用の検出結果を表すインターフェース（3D情報付き）
+ */
+export interface ARDetection extends Detection {
+  /** 推定Z軸座標（メートル単位、0に近いほど手前） */
+  depth: number;
+  /** Z軸回りの傾き角度（pitch: 上下傾き、roll: 左右傾き）度単位 */
+  orientation: {
+    pitch: number; // 上下傾き（-90～90度）
+    roll: number; // 左右傾き（-180～180度）
+  };
+}
+
+/**
  * 物体検出器の設定オプション
  */
 export interface ObjectDetectorOptions {
-  /** TensorFlow.jsモデルファイルへのパス（必須） */
-  modelPath: string;
-  /** YOLOメタデータファイルへのパス（必須） */
-  metadataPath: string;
-  /** 推論実行の間隔（ミリ秒）。デフォルト: 500ms */
-  inferenceInterval?: number;
-  /** 検出の最低信頼度スコア。デフォルト: 0.7 */
-  scoreThreshold?: number;
-  /** メモリクリーンアップを実行するテンソル数の闾値。デフォルト: 50 */
-  memoryThreshold?: number;
-  /** TensorFlow.jsバックエンド。デフォルト: 'webgl' */
-  backend?: "webgl" | "webgpu" | "wasm" | "cpu";
-  /** 物体検出時に呼び出されるコールバック関数 */
-  onDetection?: (detection: Detection) => void;
+  /** 検出設定 */
+  detection?: {
+    /** 推論実行の間隔（ミリ秒）。デフォルト: 500ms */
+    inferenceInterval?: number;
+    /** 検出の最低信頼度スコア。デフォルト: 0.7 */
+    scoreThreshold?: number;
+    /** 連続検出モードを有効にする（検出後もポーズしない） */
+    continuousDetection?: boolean;
+  };
+
+  /** 3D推定設定 */
+  threeDEstimation?: ThreeDEstimationOptions;
+
+  /** パフォーマンス設定 */
+  performance?: {
+    /** TensorFlow.jsバックエンド。デフォルト: 'webgl' */
+    backend?: "webgl" | "webgpu" | "wasm" | "cpu";
+    /** メモリクリーンアップを実行するテンソル数の闾値。デフォルト: 50 */
+    memoryThreshold?: number;
+  };
+
+  /** 物体検出時に呼び出されるコールバック関数（検出できない場合はnull、3D推定有効時はARDetection） */
+  onDetection?: (detection: Detection | ARDetection | null) => void;
   /** カメラの初期化完了時に呼び出されるコールバック関数 */
   onCameraReady?: () => void;
   /** カメラアクセスが許可されていない時に呼び出されるコールバック関数 */
@@ -83,4 +105,15 @@ export interface YOLOMetadata {
   names: Record<number, string>;
   /** クラスの総数 */
   nc: number;
+}
+
+/**
+ * 3D推定のオプション
+ */
+export interface ThreeDEstimationOptions {
+  /** 物体の実サイズ（メートル単位） */
+  objectSize: {
+    width: number;
+    height: number;
+  };
 }

@@ -3,11 +3,14 @@ import { CameraManager } from "./camera-manager";
 import { CanvasManager } from "./canvas-manager";
 import { YOLOInference } from "./yolo-inference";
 import { MLInternalError } from "../errors";
+import { CONSOLE_MESSAGES } from "../errors/error-messages";
 import { cropNormalizedVideoTensor } from "../helpers/tensor-helper";
 import { letterboxTransform } from "../helpers/yolo-helper";
+import { add3DToDetection } from "../helpers/3d-helper";
 import type {
   ObjectDetectorOptions,
   Detection,
+  ARDetection,
   LetterboxInfo,
   YOLOMetadata,
 } from "../types";
@@ -48,30 +51,51 @@ export class DetectionController {
   private lastVideoDimensions?: { width: number; height: number }; // 前回のビデオサイズ
   private lastCanvasDimensions?: { width: number; height: number }; // 前回のキャンバスサイズ
 
-  private onDetection: (detection: Detection) => void; // 検出結果コールバック
+  private onDetection: (detection: Detection | ARDetection | null) => void; // 検出結果コールバック
   private onCameraReady: () => void; // カメラ準備完了コールバック
   private onCameraNotAllowed: () => void; // カメラアクセス拒否コールバック
 
+  // 3D推定設定
+  private enable3D: boolean; // 3D推定を有効にするかどうか
+
+  private threeDOptions?: ObjectDetectorOptions["threeDEstimation"]; // 3D推定のオプション
+
+  // 連続検出設定
+  private continuousDetection: boolean; // 連続検出モードを有効にするかどうか
+
   /**
    * コントローラーの初期設定
-   * @param options 物体検出の設定オプション（モデル、メタデータパス、推論間隔等）
+   * @param modelPath TensorFlow.jsモデルファイルへのパス
+   * @param metadataPath YOLOメタデータファイルへのパス
+   * @param options 物体検出の設定オプション（推論間隔等）
    */
-  constructor(options: ObjectDetectorOptions) {
+  constructor(
+    modelPath: string,
+    metadataPath: string,
+    options: ObjectDetectorOptions = {}
+  ) {
     this.detectionIntervalMs =
-      options.inferenceInterval || DEFAULT_INFERENCE_INTERVAL_MS;
-    this.backend = options.backend || DEFAULT_BACKEND;
+      options.detection?.inferenceInterval || DEFAULT_INFERENCE_INTERVAL_MS;
+    this.backend = options.performance?.backend || DEFAULT_BACKEND;
 
     // YOLO設定
     this.yoloInference = new YOLOInference({
-      modelPath: options.modelPath,
-      metadataPath: options.metadataPath,
-      scoreThreshold: options.scoreThreshold,
-      memoryThreshold: options.memoryThreshold,
+      modelPath,
+      metadataPath,
+      scoreThreshold: options.detection?.scoreThreshold,
+      memoryThreshold: options.performance?.memoryThreshold,
     });
 
     this.onDetection = options.onDetection || (() => {});
     this.onCameraReady = options.onCameraReady || (() => {});
     this.onCameraNotAllowed = options.onCameraNotAllowed || (() => {});
+
+    // 3D推定設定
+    this.enable3D = !!options.threeDEstimation;
+    this.threeDOptions = options.threeDEstimation;
+
+    // 連続検出設定
+    this.continuousDetection = options.detection?.continuousDetection || false;
   }
 
   /**
@@ -204,7 +228,7 @@ export class DetectionController {
    * @param error 致命的エラー
    */
   private handleFatalError(error: MLInternalError): void {
-    console.error("[DetectionController] 致命的エラーが発生しました:", error);
+    console.error(CONSOLE_MESSAGES.FATAL_ERROR, error);
     this.pause();
     throw error;
   }
@@ -214,10 +238,7 @@ export class DetectionController {
    * @param error 非致命的エラー
    */
   private handleNonFatalError(error: MLInternalError): void {
-    console.warn(
-      "[DetectionController] 非致命的エラーが発生しました。処理を継続します:",
-      error
-    );
+    console.warn(CONSOLE_MESSAGES.NON_FATAL_ERROR, error);
   }
 
   /**
@@ -226,23 +247,40 @@ export class DetectionController {
    */
   private handleUnexpectedError(error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(
-      "[DetectionController] 予期しないエラーが発生しました。処理を継続します:",
-      errorMessage,
-      error
-    );
+    console.warn(CONSOLE_MESSAGES.UNEXPECTED_ERROR, errorMessage, error);
   }
 
   /**
    * 検出結果のハンドリング
    * @param detectionResults 検出結果配列
    */
-  private handleDetectionResults(detectionResults: Detection[]): void {
+  private handleDetectionResults(
+    detectionResults: Detection[] | ARDetection[]
+  ): void {
     if (detectionResults.length > 0) {
+      let result = detectionResults[0];
+
+      // 3D推定が有効で設定が揃っている場合は3D情報を追加
+      if (this.enable3D && this.threeDOptions) {
+        result = add3DToDetection(
+          result,
+          this.canvas.width,
+          this.threeDOptions.objectSize
+        ) as ARDetection;
+      }
+
       // 最高スコアの検出結果を通知
-      this.onDetection(detectionResults[0]);
-      // 検出後は一時停止してユーザーの確認を待つ
-      this.pause();
+      this.onDetection(result);
+
+      // 連続検出モードでない場合のみ一時停止
+      if (!this.continuousDetection) {
+        this.pause();
+      }
+    } else {
+      // 連続検出モードの場合は検出できなかった状態も通知
+      if (this.continuousDetection) {
+        this.onDetection(null);
+      }
     }
   }
 
@@ -294,10 +332,7 @@ export class DetectionController {
    */
   public get video(): HTMLVideoElement {
     if (!this.cameraManager) {
-      throw new MLInternalError(
-        "カメラマネージャーが初期化されていません",
-        "CAMERA_NOT_INITIALIZED"
-      );
+      throw new MLInternalError("CAMERA_MANAGER_NOT_INITIALIZED");
     }
     return this.cameraManager.video;
   }
@@ -308,10 +343,7 @@ export class DetectionController {
    */
   public get canvas(): HTMLCanvasElement {
     if (!this.canvasManager) {
-      throw new MLInternalError(
-        "キャンバスマネージャーが初期化されていません",
-        "CANVAS_NOT_INITIALIZED"
-      );
+      throw new MLInternalError("CANVAS_MANAGER_NOT_INITIALIZED");
     }
     return this.canvasManager.element;
   }
@@ -322,10 +354,7 @@ export class DetectionController {
    */
   public get canvasContext(): CanvasRenderingContext2D {
     if (!this.canvasManager) {
-      throw new MLInternalError(
-        "キャンバスマネージャーが初期化されていません",
-        "CANVAS_NOT_INITIALIZED"
-      );
+      throw new MLInternalError("CANVAS_MANAGER_NOT_INITIALIZED");
     }
     return this.canvasManager.ctx;
   }
@@ -337,10 +366,7 @@ export class DetectionController {
   public get modelInstance(): tf.GraphModel {
     const model = this.yoloInference.modelInstance;
     if (!model) {
-      throw new MLInternalError(
-        "モデルが初期化されていません",
-        "MODEL_NOT_INITIALIZED"
-      );
+      throw new MLInternalError("MODEL_NOT_INITIALIZED");
     }
     return model;
   }
@@ -352,10 +378,7 @@ export class DetectionController {
   public get metadataInstance(): YOLOMetadata {
     const metadata = this.yoloInference.metadataInstance;
     if (!metadata) {
-      throw new MLInternalError(
-        "メタデータが初期化されていません",
-        "METADATA_NOT_INITIALIZED"
-      );
+      throw new MLInternalError("METADATA_NOT_INITIALIZED");
     }
     return metadata;
   }
@@ -416,10 +439,7 @@ export class DetectionController {
 
       // letterboxTransformInfo の確認
       if (!letterboxTransformInfo) {
-        throw new MLInternalError(
-          "レターボックス変換情報が生成されませんでした",
-          "LETTERBOX_INFO_MISSING"
-        );
+        throw new MLInternalError("LETTERBOX_TRANSFORM_NOT_GENERATED");
       }
 
       // YOLO推論とキャンバス座標系への変換
