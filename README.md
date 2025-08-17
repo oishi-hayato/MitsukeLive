@@ -1,4 +1,6 @@
-<img src="assets/LOGO.png" alt="MitsukeLive Logo" width="300">
+<p align="center">
+  <img src="assets/LOGO.png" alt="MitsukeLive Logo" width="300">
+</p>
 
 # MitsukeLive
 
