@@ -1,29 +1,43 @@
-# MitsukeLive
+<div align="center">
+  <img src="assets/LOGO.png" alt="MitsukeLive Logo" width="300">
+</div>
 
-MitsukeLive は、TensorFlow.js と YOLO モデルを使用したリアルタイム物体検出ライブラリです。
+<h1>MitsukeLive<hr style="border: none; height: 1px; background-color: #e1e4e8; margin: 5px 0 0 0;"></h1>
 
-## 説明
+MitsukeLive is a real-time object detection library using TensorFlow.js and YOLO models.
 
-MitsukeLive は2つの検出モードを提供します：
+MitsukeLive provides two detection modes:
 
-| モード | 特徴 |
-|--------|------|
-| **2D検出モード** | 基本的な物体検出<br>検出時に一時停止し、結果を表示 |
-| **3D/ARモード** | 3D情報付きの高度な物体検出<br>連続検出でリアルタイム体験 |
+| Mode      | Features                                                                                       |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| **2D**    | Basic object detection<br>Pauses on detection to show results                                  |
+| **3D/AR** | Advanced object detection with 3D information<br>Continuous detection for real-time experience |
 
-## Example
+<h2>Example<hr style="border: none; height: 1px; background-color: #e1e4e8; margin: 5px 0 0 0;"></h2>
 
-デモアプリケーションを起動するには：
+To start the demo application:
 
 ```bash
 npm run example
 ```
 
-ブラウザで http://localhost:3000 にアクセスして、2 つのデモを確認できます：
+Access http://localhost:3000 in your browser to view two demos:
 
-- [object-detection-2d.html](http://localhost:3000/object-detection-2d.html) - 基本的な 2D 物体検出
-- [object-detection-ar.html](http://localhost:3000/object-detection-ar.html) - AR モード（3D 情報付き）
+- [2d.html](http://localhost:3000/2d.html) - 2D
+- [ar.html](http://localhost:3000/ar.html) - 3D/AR
 
-## ライセンス
+<h2>Documentation<hr style="border: none; height: 1px; background-color: #e1e4e8; margin: 5px 0 0 0;"></h2>
 
-Apache License 2.0 - 詳細は[LICENSE](LICENSE)ファイルを参照してください。
+Coming soon
+
+<h2>Partners<hr style="border: none; height: 1px; background-color: #e1e4e8; margin: 5px 0 0 0;"></h2>
+
+This project is supported by the following partners:
+
+<a href="https://irdl.jp/">
+  <img src="https://irdl.jp/img/irdl/logo.webp" alt="ITO REAL DESIGN Lab." width="300">
+</a>
+
+<h2>License<hr style="border: none; height: 1px; background-color: #e1e4e8; margin: 5px 0 0 0;"></h2>
+
+[Apache License 2.0](LICENSE)
