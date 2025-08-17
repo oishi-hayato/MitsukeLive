@@ -2,8 +2,6 @@
 
 # MitsukeLive
 
----
-
 MitsukeLive is a real-time object detection library using TensorFlow.js and YOLO models.
 
 MitsukeLive provides two detection modes:
@@ -14,8 +12,6 @@ MitsukeLive provides two detection modes:
 | **3D/AR** | Advanced object detection with 3D information<br>Continuous detection for real-time experience |
 
 ## Example
-
----
 
 To start the demo application:
 
@@ -30,20 +26,14 @@ Access http://localhost:3000 in your browser to view two demos:
 
 ## Documentation
 
----
-
 Coming soon
 
 ## Partners
-
----
 
 This project is supported by the following partners:
 
 <a href="https://irdl.jp/"><img src="https://irdl.jp/img/irdl/logo.webp" alt="ITO REAL DESIGN Lab." width="300"></a>
 
 ## License
-
----
 
 [Apache License 2.0](LICENSE)
