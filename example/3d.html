@@ -21,19 +21,16 @@
       const { createApp, ref, onMounted, onUnmounted } = Vue;
 
       // 定数
-      const FLASH_CONFIG = {
-        interval: 200,
-        count: 3,
-        color: "#00ff88",
-        lineWidth: 3,
-      };
-
       const MODEL_PATHS = {
         modelPath: "models/model.json",
         metadataPath: "models/metadata.yaml",
       };
 
       const DETECTOR_OPTIONS = {
+        detection: {
+          continuousDetection: true,
+          scoreThreshold: 0.7, // 70%以上のスコアのみ検知対象
+        },
         threeDEstimation: {
           objectSize: {
             width: 0.02, // 2cm
@@ -46,7 +43,6 @@
         INITIALIZING: "初期化中...",
         CAMERA_INIT: "カメラを初期化中...",
         READY: "物体をスキャンしてください",
-        DETECTION_COMPLETE: "検出完了 - 再開するには▶️をクリック",
         PAUSED: "検出停止中",
         CAMERA_DENIED: "カメラアクセスが拒否されました",
       };
@@ -72,7 +68,7 @@
           // Three.jsシーンの初期化
           const initThreeJS = () => {
             const canvas = document.getElementById("ar-canvas");
-            const video = document.getElementById("video");
+            const detectionCanvas = document.getElementById("canvas");
 
             // レンダラー作成
             renderer = new THREE.WebGLRenderer({
@@ -81,16 +77,11 @@
               antialias: true,
             });
 
-            // キャンバスサイズに合わせてレンダラーサイズを設定
-            const detectionCanvas = document.getElementById("canvas");
             renderer.setSize(detectionCanvas.width, detectionCanvas.height);
-
-            // ARキャンバスのCSSサイズも同期
             canvas.style.width =
               detectionCanvas.style.width || `${detectionCanvas.width}px`;
             canvas.style.height =
               detectionCanvas.style.height || `${detectionCanvas.height}px`;
-
             renderer.setPixelRatio(window.devicePixelRatio);
 
             // シーン作成
@@ -98,12 +89,12 @@
 
             // カメラ作成
             camera = new THREE.PerspectiveCamera(
-              50, // 視野角を狭くして遠近感を調整
+              50,
               detectionCanvas.width / detectionCanvas.height,
               0.1,
               100
             );
-            camera.position.z = 0; // カメラを原点に配置
+            camera.position.z = 0;
 
             // 複数のキューブを作成（中心のオブジェクト周りに配置）
             const cubeConfigs = [
@@ -116,14 +107,14 @@
               }, // 中心
               {
                 color: 0xff0088,
-                offsetX: 0.3,
+                offsetX: 0.02,
                 offsetY: 0,
                 offsetZ: 0,
                 name: "right",
               }, // 右
               {
                 color: 0x0088ff,
-                offsetX: -0.3,
+                offsetX: -0.02,
                 offsetY: 0,
                 offsetZ: 0,
                 name: "left",
@@ -131,14 +122,14 @@
               {
                 color: 0xffff00,
                 offsetX: 0,
-                offsetY: 0.3,
+                offsetY: 0.02,
                 offsetZ: 0,
                 name: "top",
               }, // 上
               {
                 color: 0xff8800,
                 offsetX: 0,
-                offsetY: -0.3,
+                offsetY: -0.02,
                 offsetZ: 0,
                 name: "bottom",
               }, // 下
@@ -161,9 +152,6 @@
             // ライト追加
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(1, 1, 1);
-            scene.add(directionalLight);
           };
 
           // Three.jsアニメーションループ
@@ -183,69 +171,61 @@
             }
           };
 
-          // 3Dオブジェクトの位置を更新（相対配置システムを使用）
+          // 3Dオブジェクトの位置を更新
           const update3DObject = (detection) => {
             if (cubes.length === 0 || !camera || !renderer) return;
 
             const [x, y, width, height] = detection.boundingBox;
-            console.log("Detection box:", [x, y, width, height]);
+            const detectionCanvas = document.getElementById("canvas");
+            const canvasWidth = detectionCanvas.width;
+            const canvasHeight = detectionCanvas.height;
 
-            // キャンバスサイズを取得
-            const detectionCanvas2 = document.getElementById("canvas");
-            const canvasWidth = detectionCanvas2.width;
-            const canvasHeight = detectionCanvas2.height;
+            // 検出ボックスの中心座標を計算
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
 
-            // 基本の位置計算オプション
-            const baseOptions = {
-              camera: camera,
-              canvasWidth: canvasWidth,
-              canvasHeight: canvasHeight,
-              minDepth: 2.0,
-            };
+            // Three.jsのワールド座標に変換
+            // カメラの視野角とアスペクト比を考慮した座標変換
+            const aspect = canvasWidth / canvasHeight;
+            const fov = (camera.fov * Math.PI) / 180; // ラジアンに変換
+            const depth = detection.depth;
+
+            // 視野角から視野の幅と高さを計算
+            const viewHeight = 2 * Math.tan(fov / 2) * depth;
+            const viewWidth = viewHeight * aspect;
+
+            // 正規化座標（-1 to 1）に変換
+            const normalizedX = (centerX / canvasWidth) * 2 - 1;
+            const normalizedY = -((centerY / canvasHeight) * 2 - 1); // Y軸反転
+
+            // ワールド座標に変換
+            const worldX = normalizedX * (viewWidth / 2);
+            const worldY = normalizedY * (viewHeight / 2);
+            const worldZ = -depth; // カメラから離れる方向
 
             // 各キューブの相対位置を設定
             cubes.forEach((cube, index) => {
               const config = cube.userData;
 
-              // 相対配置システムを使用して位置を計算
-              const relativePosition = MitsukeLive.calculateRelativePosition(
-                detection,
-                {
-                  ...baseOptions,
-                  offsetX: config.offsetX,
-                  offsetY: config.offsetY,
-                  offsetZ: config.offsetZ,
-                }
-              );
+              // 基本位置にオフセットを追加
+              const posX = worldX + config.offsetX;
+              const posY = worldY + config.offsetY;
+              const posZ = worldZ + config.offsetZ;
 
-              cube.position.set(
-                relativePosition.x,
-                relativePosition.y,
-                relativePosition.z
-              );
+              cube.position.set(posX, posY, posZ);
 
-              // スケール計算
-              const baseScale = index === 0 ? 1.5 : 1.0; // 中心は少し大きく
-              const finalScale = MitsukeLive.calculate3DScale(
-                detection,
-                canvasWidth,
-                canvasHeight,
-                baseScale
-              );
-
-              console.log(`${config.name} cube position:`, cube.position);
+              // スケール計算（深度に基づく - 近いほど大きく）
+              const baseScale = index === 0 ? 0.15 : 0.1; // 中心は少し大きく
+              const scale = baseScale / Math.max(depth, 0.1); // 近いほど大きく、ゼロ除算防止
+              cube.scale.set(scale, scale, scale);
 
               // 滑らかな表示アニメーション
               if (!cube.visible) {
                 cube.visible = true;
                 // 小さくスタートして拡大するアニメーション（時間差をつける）
                 setTimeout(() => {
-                  cube.scale.set(
-                    finalScale * 0.1,
-                    finalScale * 0.1,
-                    finalScale * 0.1
-                  );
-                  const targetScale = finalScale;
+                  cube.scale.set(scale * 0.1, scale * 0.1, scale * 0.1);
+                  const targetScale = scale;
                   const animateScale = () => {
                     const currentScale = cube.scale.x;
                     if (currentScale < targetScale * 0.95) {
@@ -260,7 +240,7 @@
                 }, index * 100); // 100ms間隔で順次表示
               } else {
                 // 既に表示されている場合は単純にスケールを設定
-                cube.scale.set(finalScale, finalScale, finalScale);
+                cube.scale.set(scale, scale, scale);
               }
             });
           };
@@ -275,24 +255,18 @@
           });
 
           // 検出時の処理
-          const handleDetection = async (detection) => {
+          const handleDetection = (detection) => {
             if (!state.isDetecting.value) return;
 
             if (detection) {
-              // 検出情報を更新（3D情報は内部で自動的に追加される）
               state.detectionInfo.value = formatDetectionInfo(detection);
-              // 3Dオブジェクトを配置
               update3DObject(detection);
             } else {
-              // 検出できなかった場合は情報と3Dオブジェクトを非表示
               state.detectionInfo.value = null;
               cubes.forEach((cube) => {
                 cube.visible = false;
               });
             }
-
-            // 連続検出モードでは検出状態を継続
-            // （従来のワンショット検出とは異なり、継続的に物体を追跡）
           };
 
           // 検出器の初期化
@@ -300,21 +274,10 @@
             try {
               state.status.value = MESSAGES.CAMERA_INIT;
 
-              if (!MitsukeLive) {
-                throw new Error("MitsukeLive ライブラリが読み込まれていません");
-              }
-
-              // 3D推定用の物体サイズを登録
-              MitsukeLive.setObjectSize(0.02, 0.02); // 2cm x 2cm (4cm²)
-
               const options = {
                 ...DETECTOR_OPTIONS,
-                detection: {
-                  continuousDetection: true,
-                },
                 onCameraReady: () => {
                   state.status.value = MESSAGES.READY;
-                  // カメラ準備完了後にThree.jsを初期化
                   setTimeout(() => {
                     initThreeJS();
                     animate();
@@ -326,12 +289,13 @@
                 },
               };
 
-              detector = new MitsukeLive.DetectionController(
+              detector = await MitsukeLive.createDetector(
+                "video",
+                "canvas",
                 MODEL_PATHS.modelPath,
                 MODEL_PATHS.metadataPath,
                 options
               );
-              await detector.initialize("video", "canvas");
               state.isDetecting.value = true;
             } catch (err) {
               state.error.value = `初期化エラー: ${err.message}`;

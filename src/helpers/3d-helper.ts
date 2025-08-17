@@ -1,39 +1,107 @@
-import type { Detection, ARDetection, ThreeDEstimationOptions } from "../types";
 import { MLInternalError } from "../errors";
+import { Detection, ARDetection } from "../types";
+
+// Constants
+const CONSISTENCY_EPS = 0.25; // 25% tolerance for width/height-based depth agreement
+const DIVISION_SAFETY_EPSILON = 1e-6; // small value to prevent division by zero
 
 /**
- * 3D情報（深度と傾き）
+ * Get focal length scale factor for common web cameras
+ *
+ * @returns Focal length scale factor (fixed at 0.8 for simplicity)
  */
-export interface ThreeDInfo {
-  /** 推定深度（メートル単位） */
-  depth: number;
-  /** 傾き角度（pitch: 上下傾き、roll: 左右傾き）度単位 */
-  orientation?: {
-    pitch: number;
-    roll: number;
-  };
+function getFocalScale(): number {
+  // Empirical value for common web cameras and smartphone cameras
+  return 0.8;
 }
 
 /**
- * バウンディングボックスから3D情報を推定
+ * Physics-based pitch estimation from aspect ratio change
+ * @param ratioDiff Relative difference in aspect ratio
+ * @returns Pitch angle in degrees
+ */
+function calculatePitchFromRatio(ratioDiff: number): number {
+  const absRatio = Math.abs(ratioDiff);
+  const sign = Math.sign(ratioDiff); // 符号を修正：上向き=正、下向き=負
+
+  // Physics-based calculation: ratio_diff = 1/cos(pitch) - 1
+  // Therefore: pitch = arccos(1 / (ratio_diff + 1))
+  const cosineValue = 1 / (absRatio + 1);
+
+  // Ensure valid range for arccos
+  const clampedCosine = Math.max(0, Math.min(1, cosineValue));
+  const pitchRadians = Math.acos(clampedCosine);
+  const pitchDegrees = (pitchRadians * 180) / Math.PI;
+
+  return sign * pitchDegrees;
+}
+
+/**
+ * Calculate both pitch and roll from aspect ratio analysis
+ * @param currentAspectRatio Observed aspect ratio from bounding box
+ * @param expectedAspectRatio Expected aspect ratio of object
+ * @param angle YOLO rotation angle (determines whether aspect ratio change indicates pitch or roll)
+ * @returns Object with pitch and roll angles
+ */
+function calculateOrientationFromAspectRatio(
+  currentAspectRatio: number,
+  expectedAspectRatio: number,
+  angle: number
+): { pitch: number; roll: number } {
+  // Determine if the aspect ratio change is primarily due to pitch or roll rotation
+  if (Math.abs(angle) < 5) {
+    // Small YOLO angle - aspect ratio change likely due to pitch (forward/backward tilt)
+    const ratioDiff =
+      (currentAspectRatio - expectedAspectRatio) / expectedAspectRatio;
+    const pitch = calculatePitchFromRatio(ratioDiff);
+    return { pitch, roll: 0 };
+  }
+
+  if (Math.abs(angle) > 85) {
+    // Large YOLO angle - object is rotated ~90°, aspect ratio change indicates roll
+    const ratioDiff =
+      (currentAspectRatio - expectedAspectRatio) / expectedAspectRatio;
+    const roll = calculatePitchFromRatio(ratioDiff);
+    return { pitch: 0, roll };
+  }
+
+  // Mixed case: linear interpolation between pitch and roll based on angle
+  const normalizedAngle = Math.abs(angle) / 90; // 0 to 1
+  const pitchWeight = 1 - normalizedAngle;
+  const rollWeight = normalizedAngle;
+
+  const totalRatioDiff =
+    (currentAspectRatio - expectedAspectRatio) / expectedAspectRatio;
+
+  const pitch = calculatePitchFromRatio(totalRatioDiff * pitchWeight);
+  const roll = calculatePitchFromRatio(totalRatioDiff * rollWeight);
+
+  return { pitch, roll };
+}
+
+/**
+ * Estimate 3D information from bounding box
  *
- * @param boundingBox - バウンディングボックス [x, y, width, height]
- * @param options - 3D推定のオプション
- * @returns 3D情報（深度と傾き）
+ * @param boundingBox [x, y, width, height] in pixels
+ * @param imageWidth Image width in pixels
+ * @param objectSize Real-world object size in meters
+ * @param angle Bounding box rotation angle in degrees
  */
 export function estimate3DInfo(
   boundingBox: [number, number, number, number],
   imageWidth: number,
-  options: ThreeDEstimationOptions
-): ThreeDInfo {
+  objectSize: { width: number; height: number },
+  angle: number
+) {
   const [, , width, height] = boundingBox;
-  const { objectSize } = options;
 
-  // 焦点距離を画像幅から自動推定
-  const focalLength = imageWidth;
+  // Use default configuration values
+  const focalScale = getFocalScale();
 
-  // 入力値の検証
-  if (width <= 0 || height <= 0) {
+  // Calculate focal length in pixels
+  const focalLength = focalScale * imageWidth;
+
+  if (!Number.isFinite(width) || !Number.isFinite(height)) {
     throw new MLInternalError("BOUNDING_BOX_SIZE_INVALID");
   }
 
@@ -41,35 +109,48 @@ export function estimate3DInfo(
     throw new MLInternalError("FOCAL_LENGTH_INVALID");
   }
 
-  // オプションから物体サイズを取得
+  // Real-world object size
   const realSize = {
     width: objectSize.width,
     height: objectSize.height,
     aspectRatio: objectSize.width / objectSize.height,
   };
 
-  // 深度推定
+  // Depth estimation (fusion based on width/height consistency)
   const depthFromWidth = (realSize.width * focalLength) / width;
   const depthFromHeight = (realSize.height * focalLength) / height;
-  const depth = Math.max(
-    0.01,
-    Math.min(10, Math.min(depthFromWidth, depthFromHeight))
-  );
 
-  const result: ThreeDInfo = { depth };
+  const relDiff =
+    Math.abs(depthFromWidth - depthFromHeight) /
+    Math.max(
+      Math.max(depthFromWidth, depthFromHeight),
+      DIVISION_SAFETY_EPSILON
+    );
 
-  // 傾き推定を実行
-  result.orientation = estimateOrientation(boundingBox, realSize);
+  let depth =
+    relDiff <= CONSISTENCY_EPS
+      ? 0.5 * (depthFromWidth + depthFromHeight)
+      : height > width
+      ? depthFromHeight
+      : depthFromWidth;
 
-  return result;
+  // No artificial depth constraints - let physics and detection limits apply naturally
+
+  const orientation = estimateOrientation(boundingBox, realSize, angle);
+
+  return {
+    depth,
+    orientation,
+  };
 }
 
 /**
- * バウンディングボックスの形状から物体の傾きを推定
+ * Estimate orientation (pitch and roll) from bounding box using aspect ratio analysis
  */
 function estimateOrientation(
   boundingBox: [number, number, number, number],
-  realSize: { width: number; height: number; aspectRatio: number }
+  realSize: { width: number; height: number; aspectRatio: number },
+  angle: number = 0
 ): { pitch: number; roll: number } {
   const [, , width, height] = boundingBox;
 
@@ -77,46 +158,34 @@ function estimateOrientation(
     return { pitch: 0, roll: 0 };
   }
 
-  // 現在のアスペクト比
   const currentAspectRatio = width / height;
   const expectedAspectRatio = realSize.aspectRatio;
 
-  // アスペクト比の変化からroll推定（左右傾き）
-  const aspectRatioDiff = currentAspectRatio - expectedAspectRatio;
-  const roll = Math.max(-45, Math.min(45, aspectRatioDiff * 20));
-
-  // 高さの変化からpitch推定（上下傾き）
-  const heightRatio = height / width;
-  const expectedHeightRatio = 1 / expectedAspectRatio;
-  const pitch = Math.max(
-    -30,
-    Math.min(30, (expectedHeightRatio - heightRatio) * 15)
+  return calculateOrientationFromAspectRatio(
+    currentAspectRatio,
+    expectedAspectRatio,
+    angle
   );
-
-  return { pitch, roll };
 }
 
 /**
- * 検出結果に3D情報を追加してARDetectionに変換
- *
- * @param detection - 検出結果
- * @param options - 3D推定のオプション
- * @returns ARモード用の検出結果（3D情報付き）
+ * Add 3D information to detection result
  */
 export function add3DToDetection(
   detection: Detection,
   imageWidth: number,
-  options: ThreeDEstimationOptions
+  objectSize: { width: number; height: number }
 ): ARDetection {
-  const threeDInfo = estimate3DInfo(
+  const info = estimate3DInfo(
     detection.boundingBox,
     imageWidth,
-    options
+    objectSize,
+    detection.angle
   );
 
   return {
     ...detection,
-    depth: threeDInfo.depth,
-    orientation: threeDInfo.orientation || { pitch: 0, roll: 0 },
+    depth: info.depth,
+    orientation: info.orientation,
   };
 }

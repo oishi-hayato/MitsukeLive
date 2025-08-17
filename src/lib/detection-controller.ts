@@ -254,7 +254,9 @@ export class DetectionController {
    * 検出結果のハンドリング
    * @param detectionResults 検出結果配列
    */
-  private handleDetectionResults(detectionResults: Detection[]): void {
+  private handleDetectionResults(
+    detectionResults: Detection[] | ARDetection[]
+  ): void {
     if (detectionResults.length > 0) {
       let result = detectionResults[0];
 
@@ -263,8 +265,8 @@ export class DetectionController {
         result = add3DToDetection(
           result,
           this.canvas.width,
-          this.threeDOptions
-        );
+          this.threeDOptions.objectSize
+        ) as ARDetection;
       }
 
       // 最高スコアの検出結果を通知
