@@ -22,7 +22,7 @@ function getFocalScale(): number {
  */
 function calculatePitchFromRatio(ratioDiff: number): number {
   const absRatio = Math.abs(ratioDiff);
-  const sign = Math.sign(ratioDiff); // 符号を修正：上向き=正、下向き=負
+  const sign = Math.sign(ratioDiff); // Fixed sign: upward=positive, downward=negative
 
   // Physics-based calculation: ratio_diff = 1/cos(pitch) - 1
   // Therefore: pitch = arccos(1 / (ratio_diff + 1))

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MitsukeLive - ARモードデモ</title>
+    <title>MitsukeLive - 3D/AR Mode Demo</title>
     <link rel="stylesheet" href="style.css" />
     <link
       rel="stylesheet"
@@ -20,7 +20,7 @@
 
       const { createApp, ref, onMounted, onUnmounted } = Vue;
 
-      // 定数
+      // Constants
       const MODEL_PATHS = {
         modelPath: "models/model.json",
         metadataPath: "models/metadata.yaml",
@@ -29,7 +29,7 @@
       const DETECTOR_OPTIONS = {
         detection: {
           continuousDetection: true,
-          scoreThreshold: 0.7, // 70%以上のスコアのみ検知対象
+          scoreThreshold: 0.7, // Only detect objects with 70% or higher confidence
         },
         threeDEstimation: {
           objectSize: {
@@ -40,17 +40,15 @@
       };
 
       const MESSAGES = {
-        INITIALIZING: "初期化中...",
-        CAMERA_INIT: "カメラを初期化中...",
-        READY: "物体をスキャンしてください",
-        PAUSED: "検出停止中",
-        CAMERA_DENIED: "カメラアクセスが拒否されました",
+        INITIALIZING: "Initializing...",
+        CAMERA_INIT: "Initializing camera...",
+        READY: "Please scan an object",
+        PAUSED: "Detection paused",
+        CAMERA_DENIED: "Camera access denied",
       };
 
-      // 物体検出アプリ
       const DetectionApp = {
         setup() {
-          // リアクティブ状態
           const state = {
             status: ref(MESSAGES.INITIALIZING),
             detectionInfo: ref(null),
@@ -62,15 +60,15 @@
           let scene = null;
           let camera = null;
           let renderer = null;
-          let cubes = []; // 複数のオブジェクトを管理
+          let cubes = []; // Manage multiple objects
           let animationId = null;
 
-          // Three.jsシーンの初期化
+          // Initialize Three.js scene
           const initThreeJS = () => {
             const canvas = document.getElementById("ar-canvas");
             const detectionCanvas = document.getElementById("canvas");
 
-            // レンダラー作成
+            // Create renderer
             renderer = new THREE.WebGLRenderer({
               canvas: canvas,
               alpha: true,
@@ -84,10 +82,10 @@
               detectionCanvas.style.height || `${detectionCanvas.height}px`;
             renderer.setPixelRatio(window.devicePixelRatio);
 
-            // シーン作成
+            // Create scene
             scene = new THREE.Scene();
 
-            // カメラ作成
+            // Create camera
             camera = new THREE.PerspectiveCamera(
               50,
               detectionCanvas.width / detectionCanvas.height,
@@ -96,7 +94,7 @@
             );
             camera.position.z = 0;
 
-            // 複数のキューブを作成（中心のオブジェクト周りに配置）
+            // Create multiple cubes (positioned around central object)
             const cubeConfigs = [
               {
                 color: 0x00ff88,
@@ -104,35 +102,35 @@
                 offsetY: 0,
                 offsetZ: 0,
                 name: "center",
-              }, // 中心
+              }, // center
               {
                 color: 0xff0088,
                 offsetX: 0.02,
                 offsetY: 0,
                 offsetZ: 0,
                 name: "right",
-              }, // 右
+              }, // right
               {
                 color: 0x0088ff,
                 offsetX: -0.02,
                 offsetY: 0,
                 offsetZ: 0,
                 name: "left",
-              }, // 左
+              }, // left
               {
                 color: 0xffff00,
                 offsetX: 0,
                 offsetY: 0.02,
                 offsetZ: 0,
                 name: "top",
-              }, // 上
+              }, // top
               {
                 color: 0xff8800,
                 offsetX: 0,
                 offsetY: -0.02,
                 offsetZ: 0,
                 name: "bottom",
-              }, // 下
+              }, // bottom
             ];
 
             cubeConfigs.forEach((config, index) => {
@@ -149,16 +147,16 @@
               scene.add(cube);
             });
 
-            // ライト追加
+            // Add light
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             scene.add(ambientLight);
           };
 
-          // Three.jsアニメーションループ
+          // Three.js animation loop
           const animate = () => {
             animationId = requestAnimationFrame(animate);
 
-            // 表示中のキューブを回転
+            // Rotate visible cubes
             cubes.forEach((cube) => {
               if (cube.visible) {
                 cube.rotation.x += 0.01;
@@ -171,7 +169,7 @@
             }
           };
 
-          // 3Dオブジェクトの位置を更新
+          // Update 3D object position
           const update3DObject = (detection) => {
             if (cubes.length === 0 || !camera || !renderer) return;
 
@@ -180,49 +178,49 @@
             const canvasWidth = detectionCanvas.width;
             const canvasHeight = detectionCanvas.height;
 
-            // 検出ボックスの中心座標を計算
+            // Calculate center coordinates of detection box
             const centerX = x + width / 2;
             const centerY = y + height / 2;
 
-            // Three.jsのワールド座標に変換
-            // カメラの視野角とアスペクト比を考慮した座標変換
+            // Convert to Three.js world coordinates
+            // Coordinate transformation considering camera FOV and aspect ratio
             const aspect = canvasWidth / canvasHeight;
-            const fov = (camera.fov * Math.PI) / 180; // ラジアンに変換
+            const fov = (camera.fov * Math.PI) / 180; // Convert to radians
             const depth = detection.depth;
 
-            // 視野角から視野の幅と高さを計算
+            // Calculate view width and height from FOV
             const viewHeight = 2 * Math.tan(fov / 2) * depth;
             const viewWidth = viewHeight * aspect;
 
-            // 正規化座標（-1 to 1）に変換
+            // Convert to normalized coordinates (-1 to 1)
             const normalizedX = (centerX / canvasWidth) * 2 - 1;
-            const normalizedY = -((centerY / canvasHeight) * 2 - 1); // Y軸反転
+            const normalizedY = -((centerY / canvasHeight) * 2 - 1); // Flip Y axis
 
-            // ワールド座標に変換
+            // Convert to world coordinates
             const worldX = normalizedX * (viewWidth / 2);
             const worldY = normalizedY * (viewHeight / 2);
-            const worldZ = -depth; // カメラから離れる方向
+            const worldZ = -depth; // Direction away from camera
 
-            // 各キューブの相対位置を設定
+            // Set relative position for each cube
             cubes.forEach((cube, index) => {
               const config = cube.userData;
 
-              // 基本位置にオフセットを追加
+              // Add offset to base position
               const posX = worldX + config.offsetX;
               const posY = worldY + config.offsetY;
               const posZ = worldZ + config.offsetZ;
 
               cube.position.set(posX, posY, posZ);
 
-              // スケール計算（深度に基づく - 近いほど大きく）
-              const baseScale = index === 0 ? 0.15 : 0.1; // 中心は少し大きく
-              const scale = baseScale / Math.max(depth, 0.1); // 近いほど大きく、ゼロ除算防止
+              // Scale calculation (based on depth - closer objects appear larger)
+              const baseScale = index === 0 ? 0.15 : 0.1; // Center cube slightly larger
+              const scale = baseScale / Math.max(depth, 0.1); // Closer objects larger, prevent division by zero
               cube.scale.set(scale, scale, scale);
 
-              // 滑らかな表示アニメーション
+              // Smooth display animation
               if (!cube.visible) {
                 cube.visible = true;
-                // 小さくスタートして拡大するアニメーション（時間差をつける）
+                // Animation starting small and expanding (with time delay)
                 setTimeout(() => {
                   cube.scale.set(scale * 0.1, scale * 0.1, scale * 0.1);
                   const targetScale = scale;
@@ -237,15 +235,15 @@
                     }
                   };
                   animateScale();
-                }, index * 100); // 100ms間隔で順次表示
+                }, index * 100); // Sequential display at 100ms intervals
               } else {
-                // 既に表示されている場合は単純にスケールを設定
+                // Simply set scale if already displayed
                 cube.scale.set(scale, scale, scale);
               }
             });
           };
 
-          // 検出情報をフォーマット
+          // Format detection information
           const formatDetectionInfo = (detection) => ({
             score: (detection.score * 100).toFixed(1),
             depth: detection.depth.toFixed(3),
@@ -254,7 +252,7 @@
             box: detection.boundingBox.map((v) => Math.round(v)),
           });
 
-          // 検出時の処理
+          // Handle detection
           const handleDetection = (detection) => {
             if (!state.isDetecting.value) return;
 
@@ -269,7 +267,7 @@
             }
           };
 
-          // 検出器の初期化
+          // Initialize detector
           const initDetector = async () => {
             try {
               state.status.value = MESSAGES.CAMERA_INIT;
@@ -298,12 +296,12 @@
               );
               state.isDetecting.value = true;
             } catch (err) {
-              state.error.value = `初期化エラー: ${err.message}`;
+              state.error.value = `Initialization error: ${err.message}`;
               console.error("Detection initialization failed:", err);
             }
           };
 
-          // 検出の開始/停止
+          // Start/stop detection
           const toggleDetection = () => {
             if (!detector) return;
 
@@ -322,7 +320,7 @@
             }
           };
 
-          // ライフサイクル
+          // Lifecycle
           onMounted(initDetector);
           onUnmounted(() => {
             if (animationId) {
@@ -357,33 +355,33 @@
               <button
                 class="controls__btn"
                 @click="toggleDetection"
-                :title="isDetecting ? '検出停止' : '検出開始'"
+                :title="isDetecting ? 'Stop Detection' : 'Start Detection'"
               >
                 <i :class="isDetecting ? 'mdi mdi-pause' : 'mdi mdi-play'"></i>
               </button>
             </div>
 
             <div class="info" v-if="detectionInfo">
-              <div class="info__header">ARモード - 検出情報</div>
+              <div class="info__header">3D/AR Mode - Detection Info</div>
               <div class="info__detection">
                 <div class="info__item">
-                  <span class="info__label">信頼度:</span>
+                  <span class="info__label">Score:</span>
                   <span class="info__value monospace">{{ detectionInfo.score }}%</span>
                 </div>
                 <div class="info__item">
-                  <span class="info__label">深度:</span>
+                  <span class="info__label">Depth:</span>
                   <span class="info__value monospace">{{ detectionInfo.depth }}m</span>
                 </div>
                 <div class="info__item">
-                  <span class="info__label">上下傾き:</span>
+                  <span class="info__label">Pitch:</span>
                   <span class="info__value monospace">{{ detectionInfo.pitch }}°</span>
                 </div>
                 <div class="info__item">
-                  <span class="info__label">左右傾き:</span>
+                  <span class="info__label">Roll:</span>
                   <span class="info__value monospace">{{ detectionInfo.roll }}°</span>
                 </div>
                 <div class="info__item">
-                  <span class="info__label">位置:</span>
+                  <span class="info__label">Position:</span>
                   <span class="info__value monospace">[{{ detectionInfo.box.join(', ') }}]</span>
                 </div>
               </div>
@@ -392,7 +390,6 @@
         `,
       };
 
-      // アプリをマウント
       createApp(DetectionApp).mount("#app");
     </script>
   </body>

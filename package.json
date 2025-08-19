@@ -36,6 +36,14 @@
   ],
   "author": "",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oishi-hayato/MitsukeLive.git"
+  },
+  "homepage": "https://github.com/oishi-hayato/MitsukeLive#readme",
+  "bugs": {
+    "url": "https://github.com/oishi-hayato/MitsukeLive/issues"
+  },
   "peerDependencies": {
     "@tensorflow/tfjs": "^4.22.0",
     "js-yaml": "^4.0.0",

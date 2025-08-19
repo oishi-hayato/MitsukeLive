@@ -2,11 +2,10 @@ import { MLInternalError } from "./ml-internal-error";
 
 /**
  * MLClientError
- * アプリケーション通知用のエラー
+ * Error class for application notifications
  */
 export class MLClientError extends Error {
-  /** エラーの種類を識別するコード */
-  public readonly code: string;
+  public readonly code: string; // Code to identify the type of error
 
   constructor(error: MLInternalError | Error) {
     if (error instanceof MLInternalError) {
