@@ -69,16 +69,24 @@ export class YOLOInference {
 
   /**
    * メタデータの取得
+   * @throws {MLInternalError} メタデータが初期化されていない場合
    */
   public get metadataInstance(): YOLOMetadata {
-    return this.metadata!;
+    if (!this.metadata) {
+      throw new MLInternalError("METADATA_NOT_INITIALIZED");
+    }
+    return this.metadata;
   }
 
   /**
    * モデルインスタンスの取得
+   * @throws {MLInternalError} モデルが初期化されていない場合
    */
   public get modelInstance(): tf.GraphModel {
-    return this.model!;
+    if (!this.model) {
+      throw new MLInternalError("MODEL_NOT_INITIALIZED");
+    }
+    return this.model;
   }
 
   /**

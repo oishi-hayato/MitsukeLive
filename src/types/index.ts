@@ -1,117 +1,117 @@
 /**
- * 基本物体検出結果を表すインターフェース
+ * Interface representing basic object detection results
  */
 export interface Detection {
-  /** バウンディングボックス [x, y, width, height] */
+  /** Bounding box [x, y, width, height] */
   boundingBox: [number, number, number, number];
-  /** 回転角度（度）- デフォルト値は0度 */
+  /** Rotation angle (degrees) - default value is 0 degrees */
   angle: number;
-  /** 信頼度スコア（0.0-1.0） */
+  /** Confidence score (0.0-1.0) */
   score: number;
 }
 
 /**
- * ARモード用の検出結果を表すインターフェース（3D情報付き）
+ * Interface representing detection results for AR mode (with 3D information)
  */
 export interface ARDetection extends Detection {
-  /** 推定Z軸座標（メートル単位、0に近いほど手前） */
+  /** Estimated Z-axis coordinate (in meters, closer to 0 means nearer) */
   depth: number;
-  /** Z軸回りの傾き角度（pitch: 上下傾き、roll: 左右傾き）度単位 */
+  /** Tilt angle around Z-axis (pitch: up-down tilt, roll: left-right tilt) in degrees */
   orientation: {
-    pitch: number; // 上下傾き（-90～90度）
-    roll: number; // 左右傾き（-180～180度）
+    pitch: number; // Up-down tilt (-90 to 90 degrees)
+    roll: number; // Left-right tilt (-180 to 180 degrees)
   };
 }
 
 /**
- * 物体検出器の設定オプション
+ * Configuration options for object detector
  */
 export interface ObjectDetectorOptions {
-  /** 検出設定 */
+  /** Detection settings */
   detection?: {
-    /** 推論実行の間隔（ミリ秒）。デフォルト: 500ms */
+    /** Inference execution interval (milliseconds). Default: 500ms */
     inferenceInterval?: number;
-    /** 検出の最低信頼度スコア。デフォルト: 0.7 */
+    /** Minimum confidence score for detection. Default: 0.7 */
     scoreThreshold?: number;
-    /** 連続検出モードを有効にする（検出後もポーズしない） */
+    /** Enable continuous detection mode (don't pause after detection) */
     continuousDetection?: boolean;
   };
 
-  /** 3D推定設定 */
+  /** 3D estimation settings */
   threeDEstimation?: ThreeDEstimationOptions;
 
-  /** パフォーマンス設定 */
+  /** Performance settings */
   performance?: {
-    /** TensorFlow.jsバックエンド。デフォルト: 'webgl' */
+    /** TensorFlow.js backend. Default: 'webgl' */
     backend?: "webgl" | "webgpu" | "wasm" | "cpu";
-    /** メモリクリーンアップを実行するテンソル数の闾値。デフォルト: 50 */
+    /** Threshold for tensor count to execute memory cleanup. Default: 50 */
     memoryThreshold?: number;
   };
 
-  /** 物体検出時に呼び出されるコールバック関数（検出できない場合はnull、3D推定有効時はARDetection） */
+  /** Callback function called during object detection (null if no detection, ARDetection when 3D estimation is enabled) */
   onDetection?: (detection: Detection | ARDetection | null) => void;
-  /** カメラの初期化完了時に呼び出されるコールバック関数 */
+  /** Callback function called when camera initialization is complete */
   onCameraReady?: () => void;
-  /** カメラアクセスが許可されていない時に呼び出されるコールバック関数 */
+  /** Callback function called when camera access is not allowed */
   onCameraNotAllowed?: () => void;
 }
 
 /**
- * YOLO推論インスタンスの内部設定オプション
+ * Internal configuration options for YOLO inference instance
  * @internal
  */
 export interface YOLOInferenceOptions {
-  /** TensorFlow.jsモデルファイルへのパス */
+  /** Path to TensorFlow.js model file */
   modelPath: string;
-  /** YOLOメタデータファイルへのパス */
+  /** Path to YOLO metadata file */
   metadataPath: string;
-  /** 検出の最低信頼度スコア。デフォルト: 0.7 */
+  /** Minimum confidence score for detection. Default: 0.7 */
   scoreThreshold?: number;
-  /** メモリクリーンアップを実行するテンソル数の闾値。デフォルト: 50 */
+  /** Threshold for tensor count to execute memory cleanup. Default: 50 */
   memoryThreshold?: number;
 }
 
 /**
- * レターボックス変換の情報を格納するインターフェース
- * 画像をモデルの入力サイズに合わせるための変換パラメータを保持します
+ * Interface storing letterbox transformation information
+ * Holds transformation parameters for adjusting image to model input size
  *
  * @interface LetterboxInfo
- * @description アスペクト比を維持したままリサイズし、パディングで調整する際の変換情報
+ * @description Transformation information when resizing while maintaining aspect ratio and adjusting with padding
  */
 export interface LetterboxInfo {
-  /** スケール率 */
+  /** Scale ratio */
   scale: number;
-  /** 上余白 */
+  /** Top margin */
   top: number;
-  /** 左余白 */
+  /** Left margin */
   left: number;
-  /** パディング適用前の幅 */
+  /** Width before padding applied */
   scaledWidth: number;
-  /** パディング適用前の高さ */
+  /** Height before padding applied */
   scaledHeight: number;
-  /** クロップ幅 */
+  /** Crop width */
   croppedWidth?: number;
-  /** クロップ高さ */
+  /** Crop height */
   croppedHeight?: number;
 }
 
 /**
- * YOLOメタデータの型定義
+ * Type definition for YOLO metadata
  */
 export interface YOLOMetadata {
-  /** モデルの入力画像サイズ [width, height] */
+  /** Model input image size [width, height] */
   imgsz: [number, number];
-  /** クラス名の配列 */
+  /** Array of class names */
   names: Record<number, string>;
-  /** クラスの総数 */
+  /** Total number of classes */
   nc: number;
 }
 
 /**
- * 3D推定のオプション
+ * Options for 3D estimation
  */
 export interface ThreeDEstimationOptions {
-  /** 物体の実サイズ（メートル単位） */
+  /** Real size of object (in meters) */
   objectSize: {
     width: number;
     height: number;

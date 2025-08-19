@@ -359,29 +359,6 @@ export class DetectionController {
     return this.canvasManager.ctx;
   }
 
-  /**
-   * モデルインスタンスの取得
-   * @throws {MLInternalError} モデルが初期化されていない場合
-   */
-  public get modelInstance(): tf.GraphModel {
-    const model = this.yoloInference.modelInstance;
-    if (!model) {
-      throw new MLInternalError("MODEL_NOT_INITIALIZED");
-    }
-    return model;
-  }
-
-  /**
-   * メタデータの取得
-   * @throws {MLInternalError} メタデータが初期化されていない場合
-   */
-  public get metadataInstance(): YOLOMetadata {
-    const metadata = this.yoloInference.metadataInstance;
-    if (!metadata) {
-      throw new MLInternalError("METADATA_NOT_INITIALIZED");
-    }
-    return metadata;
-  }
 
   /**
    * ビデオフレームからテンソルを作成し、YOLO推論を実行してキャンバス座標系の検出結果を返す
@@ -423,7 +400,7 @@ export class DetectionController {
           letterboxInfo: letterboxTransformResult,
         } = letterboxTransform(
           normalizedCroppedTensor,
-          this.metadataInstance.imgsz
+          this.yoloInference.metadataInstance.imgsz
         );
 
         // 座標変換に必要なクロップ情報を追加

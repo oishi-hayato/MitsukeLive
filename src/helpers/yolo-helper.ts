@@ -2,19 +2,19 @@ import type * as tf from "@tensorflow/tfjs";
 import type { LetterboxInfo, Detection } from "../types";
 import { MLInternalError } from "../errors";
 
-// 型エイリアス
+// Type aliases
 type BoundingBox = [number, number, number, number];
 type Rect = { x: number; y: number; width: number; height: number };
 type PaddingList = [[number, number], [number, number], [number, number]];
 
-// 定数
+// Constants
 const RADIANS_TO_DEGREES = 180 / Math.PI;
 
 /**
- * ラジアンから度への変換
+ * Convert radians to degrees
  *
- * @param radians - ラジアン値（有限の数値のみ。NaN、Infinity、-Infinityは無効）
- * @returns 度数値（ラジアン値 × 180 / π）
+ * @param radians - Radian value (finite numbers only. NaN, Infinity, -Infinity are invalid)
+ * @returns Degree value (radian value × 180 / π)
  */
 export function convertRadiansToDegrees(radians: number): number {
   if (!Number.isFinite(radians)) {
@@ -25,13 +25,13 @@ export function convertRadiansToDegrees(radians: number): number {
 }
 
 /**
- * アスペクト比維持でのスケール計算
+ * Scale calculation with aspect ratio preservation
  *
- * @param sourceWidth - 元画像の幅
- * @param sourceHeight - 元画像の高さ
- * @param targetWidth - 目標幅
- * @param targetHeight - 目標高さ
- * @returns スケール情報オブジェクト
+ * @param sourceWidth - Original image width
+ * @param sourceHeight - Original image height
+ * @param targetWidth - Target width
+ * @param targetHeight - Target height
+ * @returns Scale information object
  */
 export function calculateOptimalScale(
   originalWidth: number,
@@ -54,14 +54,14 @@ export function calculateOptimalScale(
 }
 
 /**
- * レターボックス処理のための中央揃えパディングを計算
- * TensorFlow.js の pad にそのまま渡せる形式で返す
+ * Calculate center-aligned padding for letterbox processing
+ * Returns in format that can be passed directly to TensorFlow.js pad
  *
- * @param scaledWidth - スケール後の幅
- * @param scaledHeight - スケール後の高さ
- * @param targetWidth - 目標幅
- * @param targetHeight - 目標高さ
- * @returns パディング情報オブジェクト
+ * @param scaledWidth - Width after scaling
+ * @param scaledHeight - Height after scaling
+ * @param targetWidth - Target width
+ * @param targetHeight - Target height
+ * @returns Padding information object
  */
 export function calculatePadding(
   scaledWidth: number,
@@ -94,22 +94,22 @@ export function calculatePadding(
 }
 
 /**
- * YOLO入力用のレターボックス変換
+ * Letterbox transformation for YOLO input
  *
- * @param image - 変換対象の3次元画像テンソル [height, width, channels]
- * @param targetShape - 目標サイズ [height, width]（デフォルト: [640, 640]）
- * @returns 変換後の画像テンソルと変換情報
+ * @param image - 3D image tensor to transform [height, width, channels]
+ * @param targetShape - Target size [height, width] (default: [640, 640])
+ * @returns Transformed image tensor and transformation information
  */
 export function letterboxTransform(
   image: tf.Tensor3D,
   letterboxShape: [number, number] = [640, 640]
 ): { output: tf.Tensor3D; letterboxInfo: LetterboxInfo } {
-  // 入力検証: 3次元テンソルかどうか
+  // Input validation: Check if 3D tensor
   if (image.shape.length !== 3) {
     throw new MLInternalError("INPUT_MUST_BE_3D_TENSOR");
   }
 
-  // 入力検証: 目標サイズが正の値かどうか
+  // Input validation: Check if target size is positive
   const [letterboxHeight, letterboxWidth] = letterboxShape;
   if (letterboxWidth <= 0 || letterboxHeight <= 0) {
     throw new MLInternalError("INVALID_TARGET_IMAGE_SIZE");
@@ -117,7 +117,7 @@ export function letterboxTransform(
 
   const [originalHeight, originalWidth] = image.shape;
 
-  // アスペクト比を維持したスケールとリサイズ後のサイズを計算
+  // Calculate scale maintaining aspect ratio and post-resize size
   const { scaleRatio, scaledWidth, scaledHeight } = calculateOptimalScale(
     originalWidth,
     originalHeight,
@@ -125,11 +125,11 @@ export function letterboxTransform(
     letterboxHeight
   );
 
-  // リサイズ後のテンソル（中間オブジェクト）
+  // Resized tensor (intermediate object)
   const resizedImage = image.resizeBilinear([scaledHeight, scaledWidth]);
 
   try {
-    // レターボックス用のパディング量を計算
+    // Calculate padding amount for letterbox
     const { top, left, paddingList } = calculatePadding(
       scaledWidth,
       scaledHeight,
@@ -137,7 +137,7 @@ export function letterboxTransform(
       letterboxHeight
     );
 
-    // レターボックス処理でパディングを追加した画像
+    // Image with padding added by letterbox processing
     const paddedImage = resizedImage.pad(paddingList, 0) as tf.Tensor3D;
 
     return {
@@ -151,22 +151,22 @@ export function letterboxTransform(
       },
     };
   } finally {
-    // 中間テンソルの確実な破棄（メモリリーク防止）
+    // Ensure disposal of intermediate tensor (prevent memory leak)
     resizedImage.dispose();
   }
 }
 
 /**
- * レターボックス座標を元画像座標に変換
+ * Convert letterbox coordinates to original image coordinates
  *
- * @param x - レターボックス座標のX位置（ピクセル単位）
- * @param y - レターボックス座標のY位置（ピクセル単位）
- * @param width - レターボックス座標の幅（ピクセル単位、>= 0）
- * @param height - レターボックス座標の高さ（ピクセル単位、>= 0）
- * @param scale - レターボックス変換時のスケール（> 0）
- * @param top - 上パディング（ピクセル単位）
- * @param left - 左パディング（ピクセル単位）
- * @returns 元画像座標（ピクセル単位）
+ * @param x - X position in letterbox coordinates (pixel units)
+ * @param y - Y position in letterbox coordinates (pixel units)
+ * @param width - Width in letterbox coordinates (pixel units, >= 0)
+ * @param height - Height in letterbox coordinates (pixel units, >= 0)
+ * @param scale - Scale during letterbox transformation (> 0)
+ * @param top - Top padding (pixel units)
+ * @param left - Left padding (pixel units)
+ * @returns Original image coordinates (pixel units)
  */
 export function letterboxToOriginal(
   x: number,
@@ -177,7 +177,7 @@ export function letterboxToOriginal(
   top: number,
   left: number
 ): Rect {
-  // 入力検証: 有限数値かどうか
+  // Input validation: Check if finite numbers
   if (
     !Number.isFinite(x) ||
     !Number.isFinite(y) ||
@@ -195,7 +195,7 @@ export function letterboxToOriginal(
     throw new MLInternalError("INVALID_PADDING_VALUES", false);
   }
 
-  // 幅と高さが負の値の場合はエラー
+  // Error if width and height are negative
   if (width < 0 || height < 0) {
     throw new MLInternalError("NEGATIVE_WIDTH_OR_HEIGHT", false);
   }
@@ -209,19 +209,19 @@ export function letterboxToOriginal(
 }
 
 /**
- * 元画像座標をキャンバス座標に変換
+ * Convert original image coordinates to canvas coordinates
  *
- * @param rect - 元画像座標の矩形情報
- * @param canvasElement - キャンバス要素
- * @param croppedRegionSize - クロップ領域のサイズ情報
- * @returns キャンバス座標
+ * @param rect - Rectangle information in original image coordinates
+ * @param canvasElement - Canvas element
+ * @param croppedRegionSize - Size information of cropped region
+ * @returns Canvas coordinates
  */
 export function originalToCanvas(
   rect: Rect,
   canvasElement: HTMLCanvasElement,
   croppedSize: { width: number; height: number }
 ): Rect {
-  // 入力検証: 有限数値かどうか
+  // Input validation: Check if finite numbers
   if (
     !Number.isFinite(rect.x) ||
     !Number.isFinite(rect.y) ||
@@ -246,12 +246,12 @@ export function originalToCanvas(
     throw new MLInternalError("INVALID_CANVAS_SIZE", false);
   }
 
-  // 幅と高さが負の値の場合はエラー
+  // Error if width and height are negative
   if (rect.width < 0 || rect.height < 0) {
     throw new MLInternalError("NEGATIVE_WIDTH_OR_HEIGHT", false);
   }
 
-  // クロップ領域からキャンバスへのアスペクト比維持スケール計算
+  // Calculate aspect ratio preserving scale from crop region to canvas
   const scaleX = canvasElement.width / croppedSize.width;
   const scaleY = canvasElement.height / croppedSize.height;
   const scale = Math.min(scaleX, scaleY);
@@ -265,19 +265,19 @@ export function originalToCanvas(
 }
 
 /**
- * YOLO出力の座標をキャンバス描画用座標に変換
+ * Convert YOLO output coordinates to canvas drawing coordinates
  *
- * @param predictions - 変換対象の検出結果配列（空配列の場合は空配列を返す）
- * @param letterboxInfo - レターボックス変換時の情報（croppedWidth/Heightは必須）
- * @param canvasElement - 描画対象のキャンバス要素（サイズ > 0である必要あり）
- * @returns キャンバス座標系に変換された検出結果配列
+ * @param predictions - Array of detection results to convert (returns empty array if empty)
+ * @param letterboxInfo - Information from letterbox transformation (croppedWidth/Height required)
+ * @param canvasElement - Canvas element for drawing (size must be > 0)
+ * @returns Array of detection results converted to canvas coordinate system
  */
 export function transformToCanvas(
   predictions: Detection[],
   letterboxInfo: LetterboxInfo,
   canvasElement: HTMLCanvasElement
 ): Detection[] {
-  // 入力検証
+  // Input validation
   if (!predictions || predictions.length === 0) {
     return [];
   }
@@ -288,7 +288,7 @@ export function transformToCanvas(
 
   const { scale, top, left, croppedWidth, croppedHeight } = letterboxInfo;
 
-  // 必須フィールドの検証
+  // Validate required fields
   if (
     !Number.isFinite(scale) ||
     scale <= 0 ||
@@ -302,13 +302,13 @@ export function transformToCanvas(
     throw new MLInternalError("INVALID_LETTERBOX_INFO");
   }
 
-  // フィルタリングと変換を同時に実行（無効な項目をスキップ）
+  // Perform filtering and transformation simultaneously (skip invalid items)
   const validTransformedPredictions: Detection[] = [];
 
   for (const prediction of predictions) {
     const { boundingBox, angle, score } = prediction;
 
-    // 基本検証（無効な場合はスキップ）
+    // Basic validation (skip if invalid)
     if (
       !boundingBox ||
       boundingBox.length !== 4 ||
@@ -320,13 +320,13 @@ export function transformToCanvas(
     }
     const [x, y, width, height] = boundingBox;
 
-    // サイズ検証（負の値はスキップ）
+    // Size validation (skip negative values)
     if (width < 0 || height < 0) {
       continue;
     }
 
     try {
-      // レターボックス座標から元画像座標に逆変換
+      // Inverse transform from letterbox coordinates to original image coordinates
       const originalRect = letterboxToOriginal(
         x,
         y,
@@ -337,7 +337,7 @@ export function transformToCanvas(
         left
       );
 
-      // 元画像座標からキャンバス座標に変換
+      // Convert from original image coordinates to canvas coordinates
       const canvasRect = originalToCanvas(originalRect, canvasElement, {
         width: croppedWidth,
         height: croppedHeight,
@@ -356,7 +356,7 @@ export function transformToCanvas(
         score,
       });
     } catch (error) {
-      // 座標変換エラーの場合はスキップして継続
+      // Skip and continue on coordinate transformation error
       continue;
     }
   }
@@ -365,22 +365,22 @@ export function transformToCanvas(
 }
 
 /**
- * 閾値以上の検出結果を取得（スコア降順）
+ * Get detection results above threshold (sorted by score descending)
  *
- * @param data - モデル出力データの2次元配列 [x[], y[], width[], height[], score[], angle?[]]
- * @param numDetections - 検出数（>= 0）
- * @param scoreThreshold - スコア閾値（0.0-1.0）
- * @returns スコア閾値以上の検出結果配列（スコア降順）
+ * @param data - 2D array of model output data [x[], y[], width[], height[], score[], angle?[]]
+ * @param numDetections - Number of detections (>= 0)
+ * @param scoreThreshold - Score threshold (0.0-1.0)
+ * @returns Array of detection results above score threshold (sorted by score descending)
  */
 export function findValidDetections(
   data: number[][],
   numDetections: number,
   scoreThreshold: number
 ): Detection[] {
-  // 入力検証
+  // Input validation
   if (
     !data ||
-    data.length < 5 || // 最低5個の配列が必要（boundingBox用4個 + score用1個）
+    data.length < 5 || // Minimum 5 arrays required (4 for boundingBox + 1 for score)
     !Number.isFinite(numDetections) ||
     numDetections < 0 ||
     !Number.isFinite(scoreThreshold) ||
@@ -390,7 +390,7 @@ export function findValidDetections(
     return [];
   }
 
-  // 各配列の最小長チェック
+  // Check minimum length of each array
   const minRequiredLength = Math.min(
     data[0]?.length || 0,
     data[1]?.length || 0,
@@ -403,7 +403,7 @@ export function findValidDetections(
     return [];
   }
 
-  // 実際の検出数を制限
+  // Limit actual number of detections
   const actualDetections = Math.min(numDetections, minRequiredLength);
 
   const validDetections: Detection[] = [];
@@ -411,12 +411,12 @@ export function findValidDetections(
   for (let i = 0; i < actualDetections; i++) {
     const score = data[4][i];
 
-    // スコア値の検証
+    // Validate score value
     if (!Number.isFinite(score) || score <= scoreThreshold) {
       continue;
     }
 
-    // バウンディングボックスの検証
+    // Validate bounding box
     const x = data[0][i];
     const y = data[1][i];
     const width = data[2][i];
@@ -433,7 +433,7 @@ export function findValidDetections(
       continue;
     }
 
-    // 角度の取得と検証
+    // Get and validate angle
     let angle = 0;
     if (data[5] && i < data[5].length) {
       const angleValue = data[5][i];
@@ -448,6 +448,6 @@ export function findValidDetections(
     });
   }
 
-  // スコア降順でソート
+  // Sort by score descending
   return validDetections.sort((a, b) => b.score - a.score);
 }

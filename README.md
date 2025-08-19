@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/LOGO.png" alt="MitsukeLive Logo" width="300">
+  <img src="https://raw.githubusercontent.com/oishi-hayato/MitsukeLive/refs/heads/main/assets/LOGO.png" alt="MitsukeLive Logo" width="300">
 </p>
 
 # MitsukeLive

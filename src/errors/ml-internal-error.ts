@@ -2,7 +2,7 @@ import { ERROR_MESSAGES } from "./error-messages";
 
 /**
  * MLInternalError
- * ライブラリ内部処理で発生するエラー（内部用、非公開）
+ * Error that occurs in library internal processing (internal use, private)
  */
 export class MLInternalError extends Error {
   public readonly code: string;

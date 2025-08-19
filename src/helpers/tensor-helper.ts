@@ -1,22 +1,22 @@
 import * as tf from "@tensorflow/tfjs";
 
 /**
- * ビデオ要素から正規化されたテンソルを生成
- * @param videoElement - ビデオ要素
- * @returns 0〜1 に正規化された RGB の tf.Tensor3D
+ * Generate normalized tensor from video element
+ * @param videoElement - Video element
+ * @returns RGB tf.Tensor3D normalized to 0-1
  */
 function getNormalizedVideoTensor(videoElement: HTMLVideoElement): tf.Tensor3D {
   return tf.browser.fromPixels(videoElement).toFloat().div(tf.scalar(255.0));
 }
 
 /**
- * ビデオ映像の一部を切り出し、正規化テンソルを生成
- * @param videoElement - ビデオ要素
- * @param cropX - クロップの開始 X 座標
- * @param cropY - クロップの開始 Y 座標
- * @param width - クロップする幅
- * @param height - クロップする高さ
- * @returns 指定範囲を切り出した、0〜1 に正規化された RGB の tf.Tensor3D
+ * Crop a portion of video footage and generate normalized tensor
+ * @param videoElement - Video element
+ * @param cropX - Crop start X coordinate
+ * @param cropY - Crop start Y coordinate
+ * @param width - Width to crop
+ * @param height - Height to crop
+ * @returns RGB tf.Tensor3D normalized to 0-1 from the specified range
  */
 export function cropNormalizedVideoTensor(
   videoElement: HTMLVideoElement,
