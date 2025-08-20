@@ -12,62 +12,61 @@ import type {
   Detection,
   ARDetection,
   LetterboxInfo,
-  YOLOMetadata,
 } from "../types";
 
-// 型定義
+// Type definitions
 type TensorFlowBackend = "webgl" | "webgpu" | "wasm" | "cpu";
 
-// 定数定義
+// Constant definitions
 const DEFAULT_INFERENCE_INTERVAL_MS = 500;
 const DEFAULT_BACKEND: TensorFlowBackend = "webgl";
 const RESUME_DELAY_MS = 1000;
 const BYTES_TO_MB = 1024 * 1024;
 
 /**
- * 物体検出コントローラー
- * カメラ、キャンバス、YOLO推論を統合管理し、リアルタイム検出ループを実行
- * エラー発生時も検出処理を継続するためのfatal/非fatalエラーハンドリングを実装
+ * Object Detection Controller
+ * Integrates camera, canvas, and YOLO inference management and runs real-time detection loops
+ * Implements fatal/non-fatal error handling to continue detection processing even when errors occur
  */
-// 検出状態の定義
+// Detection state definitions
 enum DetectionState {
-  IDLE = "idle", // アイドル状態（検出可能）
-  PROCESSING = "processing", // 検出処理実行中
-  PAUSED = "paused", // 一時停止中
+  IDLE = "idle", // Idle state (detection ready)
+  PROCESSING = "processing", // Detection processing in progress
+  PAUSED = "paused", // Paused
 }
 
 export class DetectionController {
-  private detectionIntervalMs: number; // 検出実行間隔（ミリ秒）
-  private yoloInference: YOLOInference; // YOLO推論インスタンス
-  private detectionState = DetectionState.IDLE; // 現在の検出状態
-  private lastDetectionTimestamp = 0; // 最後の検出実行時刻
-  private cameraManager: CameraManager | null = null; // カメラ管理インスタンス
-  private canvasManager: CanvasManager | null = null; // キャンバス管理インスタンス
-  private backend: TensorFlowBackend; // TensorFlow.jsバックエンド
-  private animationFrameId: number | null = null; // アニメーションフレームID
+  private detectionIntervalMs: number; // Detection execution interval (milliseconds)
+  private yoloInference: YOLOInference; // YOLO inference instance
+  private detectionState = DetectionState.IDLE; // Current detection state
+  private lastDetectionTimestamp = 0; // Last detection execution time
+  private cameraManager: CameraManager | null = null; // Camera management instance
+  private canvasManager: CanvasManager | null = null; // Canvas management instance
+  private backend: TensorFlowBackend; // TensorFlow.js backend
+  private animationFrameId: number | null = null; // Animation frame ID
 
-  // パフォーマンス最適化用キャッシュ
-  private cachedCropRegion?: ReturnType<typeof this.calculateCropRegion>; // クロップ領域キャッシュ
-  private lastVideoDimensions?: { width: number; height: number }; // 前回のビデオサイズ
-  private lastCanvasDimensions?: { width: number; height: number }; // 前回のキャンバスサイズ
+  // Performance optimization cache
+  private cachedCropRegion?: ReturnType<typeof this.calculateCropRegion>; // Crop region cache
+  private lastVideoDimensions?: { width: number; height: number }; // Previous video dimensions
+  private lastCanvasDimensions?: { width: number; height: number }; // Previous canvas dimensions
 
-  private onDetection: (detection: Detection | ARDetection | null) => void; // 検出結果コールバック
-  private onCameraReady: () => void; // カメラ準備完了コールバック
-  private onCameraNotAllowed: () => void; // カメラアクセス拒否コールバック
+  private onDetection: (detection: Detection | ARDetection | null) => void; // Detection result callback
+  private onCameraReady: () => void; // Camera ready callback
+  private onCameraNotAllowed: () => void; // Camera access denied callback
 
-  // 3D推定設定
-  private enable3D: boolean; // 3D推定を有効にするかどうか
+  // 3D estimation settings
+  private enable3D: boolean; // Whether to enable 3D estimation
 
-  private threeDOptions?: ObjectDetectorOptions["threeDEstimation"]; // 3D推定のオプション
+  private threeDOptions?: ObjectDetectorOptions["threeDEstimation"]; // 3D estimation options
 
-  // 連続検出設定
-  private continuousDetection: boolean; // 連続検出モードを有効にするかどうか
+  // Continuous detection settings
+  private continuousDetection: boolean; // Whether to enable continuous detection mode
 
   /**
-   * コントローラーの初期設定
-   * @param modelPath TensorFlow.jsモデルファイルへのパス
-   * @param metadataPath YOLOメタデータファイルへのパス
-   * @param options 物体検出の設定オプション（推論間隔等）
+   * Controller initial configuration
+   * @param modelPath Path to TensorFlow.js model file
+   * @param metadataPath Path to YOLO metadata file
+   * @param options Object detection configuration options (inference interval, etc.)
    */
   constructor(
     modelPath: string,
@@ -78,7 +77,7 @@ export class DetectionController {
       options.detection?.inferenceInterval || DEFAULT_INFERENCE_INTERVAL_MS;
     this.backend = options.performance?.backend || DEFAULT_BACKEND;
 
-    // YOLO設定
+    // YOLO configuration
     this.yoloInference = new YOLOInference({
       modelPath,
       metadataPath,
@@ -90,24 +89,24 @@ export class DetectionController {
     this.onCameraReady = options.onCameraReady || (() => {});
     this.onCameraNotAllowed = options.onCameraNotAllowed || (() => {});
 
-    // 3D推定設定
+    // 3D estimation configuration
     this.enable3D = !!options.threeDEstimation;
     this.threeDOptions = options.threeDEstimation;
 
-    // 連続検出設定
+    // Continuous detection configuration
     this.continuousDetection = options.detection?.continuousDetection || false;
   }
 
   /**
-   * コントローラーの初期化とリアルタイム検出開始
-   * @param videoElementId カメラ映像を表示するvideo要素のID
-   * @param canvasElementId 検出結果を描画するcanvas要素のID
+   * Controller initialization and real-time detection start
+   * @param videoElementId ID of video element to display camera feed
+   * @param canvasElementId ID of canvas element to draw detection results
    */
   public async initialize(
     videoElementId: string,
     canvasElementId: string
   ): Promise<void> {
-    // TensorFlow.jsバックエンド設定
+    // TensorFlow.js backend configuration
     await this.setupBackend();
 
     await this.yoloInference.initialize();
@@ -115,7 +114,7 @@ export class DetectionController {
     try {
       await this.setupCamera(videoElementId);
     } catch (error: unknown) {
-      // カメラアクセス拒否
+      // Camera access denied
       if (error instanceof Error && error.name === "NotAllowedError") {
         this.onCameraNotAllowed();
         return;
@@ -139,16 +138,16 @@ export class DetectionController {
   }
 
   /**
-   * 物体検出処理の実行
-   * クロップ、推論、結果処理を一連で実行し、検出結果を返す
-   * @returns 検出結果の配列（キャンバス座標系）
+   * Execute object detection processing
+   * Performs cropping, inference, and result processing in sequence and returns detection results
+   * @returns Array of detection results (in canvas coordinate system)
    */
   private async detectObjects(): Promise<Detection[]> {
-    // アスペクト比に基づくクロップ領域を計算（キャッシュ利用）
+    // Calculate crop region based on aspect ratio (using cache)
     const { cropX, cropY, croppedWidth, croppedHeight } =
       this.getCachedCropRegion();
 
-    // テンソル作成とYOLO推論を実行
+    // Create tensor and run YOLO inference
     const { detectionResults } = await this.preprocessVideoFrameAndPredict(
       cropX,
       cropY,
@@ -156,10 +155,10 @@ export class DetectionController {
       croppedHeight
     );
 
-    // 検出結果の処理
+    // Process detection results
     this.handleDetectionResults(detectionResults);
 
-    // キャンバスをクリアして次の描画に備える
+    // Clear canvas and prepare for next drawing
     const canvas = this.canvas;
     const context = this.canvasContext;
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -168,15 +167,15 @@ export class DetectionController {
   }
 
   /**
-   * リアルタイム検出ループの開始
-   * requestAnimationFrameを使用して継続的に物体検出を実行
-   * エラー発生時もfatal/非fatalに応じて適切にハンドリング
+   * Start real-time detection loop
+   * Uses requestAnimationFrame to continuously execute object detection
+   * Handles errors appropriately based on fatal/non-fatal classification
    */
   private startDetectionLoop(): void {
     const detectionLoop = async () => {
       const currentTime = Date.now();
 
-      // 実行条件チェック（アイドル状態かつ間隔条件を満たす）
+      // Check execution conditions (idle state and meets interval condition)
       if (this.shouldExecuteDetection(currentTime)) {
         this.detectionState = DetectionState.PROCESSING;
         this.lastDetectionTimestamp = currentTime;
@@ -192,7 +191,7 @@ export class DetectionController {
         }
       }
 
-      // 次フレームで再実行
+      // Re-execute on next frame
       this.animationFrameId = requestAnimationFrame(detectionLoop);
     };
 
@@ -200,8 +199,8 @@ export class DetectionController {
   }
 
   /**
-   * 検出エラーのハンドリング
-   * @param error 発生したエラー
+   * Handle detection errors
+   * @param error The error that occurred
    */
   private handleDetectionError(error: unknown): void {
     if (error instanceof MLInternalError) {
@@ -212,8 +211,8 @@ export class DetectionController {
   }
 
   /**
-   * ML関連エラーのハンドリング
-   * @param error MLInternalErrorインスタンス
+   * Handle ML-related errors
+   * @param error MLInternalError instance
    */
   private handleMLError(error: MLInternalError): void {
     if (error.fatal) {
@@ -224,8 +223,8 @@ export class DetectionController {
   }
 
   /**
-   * 致命的エラーのハンドリング
-   * @param error 致命的エラー
+   * Handle fatal errors
+   * @param error Fatal error
    */
   private handleFatalError(error: MLInternalError): void {
     console.error(CONSOLE_MESSAGES.FATAL_ERROR, error);
@@ -234,16 +233,16 @@ export class DetectionController {
   }
 
   /**
-   * 非致命的エラーのハンドリング
-   * @param error 非致命的エラー
+   * Handle non-fatal errors
+   * @param error Non-fatal error
    */
   private handleNonFatalError(error: MLInternalError): void {
     console.warn(CONSOLE_MESSAGES.NON_FATAL_ERROR, error);
   }
 
   /**
-   * 予期しないエラーのハンドリング
-   * @param error 予期しないエラー
+   * Handle unexpected errors
+   * @param error Unexpected error
    */
   private handleUnexpectedError(error: unknown): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -251,8 +250,8 @@ export class DetectionController {
   }
 
   /**
-   * 検出結果のハンドリング
-   * @param detectionResults 検出結果配列
+   * Handle detection results
+   * @param detectionResults Detection results array
    */
   private handleDetectionResults(
     detectionResults: Detection[] | ARDetection[]
@@ -260,7 +259,7 @@ export class DetectionController {
     if (detectionResults.length > 0) {
       let result = detectionResults[0];
 
-      // 3D推定が有効で設定が揃っている場合は3D情報を追加
+      // Add 3D information if 3D estimation is enabled and settings are configured
       if (this.enable3D && this.threeDOptions) {
         result = add3DToDetection(
           result,
@@ -269,15 +268,15 @@ export class DetectionController {
         ) as ARDetection;
       }
 
-      // 最高スコアの検出結果を通知
+      // Notify highest score detection result
       this.onDetection(result);
 
-      // 連続検出モードでない場合のみ一時停止
+      // Pause only if not in continuous detection mode
       if (!this.continuousDetection) {
         this.pause();
       }
     } else {
-      // 連続検出モードの場合は検出できなかった状態も通知
+      // In continuous detection mode, also notify when no detection was made
       if (this.continuousDetection) {
         this.onDetection(null);
       }
@@ -285,9 +284,9 @@ export class DetectionController {
   }
 
   /**
-   * 検出実行可否の判定
-   * @param currentTime 現在時刻（ミリ秒）
-   * @returns 実行可能かどうか
+   * Determine whether detection execution is possible
+   * @param currentTime Current time (milliseconds)
+   * @returns Whether execution is possible
    */
   private shouldExecuteDetection(currentTime: number): boolean {
     return (
@@ -297,8 +296,8 @@ export class DetectionController {
   }
 
   /**
-   * 検出処理の一時停止
-   * 検出ループは継続するが、実際の推論処理をスキップ
+   * Pause detection processing
+   * Detection loop continues but skips actual inference processing
    */
   public pause(): void {
     this.detectionState = DetectionState.PAUSED;
@@ -306,8 +305,8 @@ export class DetectionController {
   }
 
   /**
-   * 検出処理の再開
-   * 1秒の遅延後に検出処理を再開
+   * Resume detection processing
+   * Resumes detection processing after a 1 second delay
    */
   public async resume(): Promise<void> {
     const resetToIdleState = () => {
@@ -327,8 +326,8 @@ export class DetectionController {
   }
 
   /**
-   * ビデオ要素の取得
-   * @throws {MLInternalError} カメラマネージャーが初期化されていない場合
+   * Get video element
+   * @throws {MLInternalError} When camera manager is not initialized
    */
   public get video(): HTMLVideoElement {
     if (!this.cameraManager) {
@@ -338,8 +337,8 @@ export class DetectionController {
   }
 
   /**
-   * キャンバス要素の取得
-   * @throws {MLInternalError} キャンバスマネージャーが初期化されていない場合
+   * Get canvas element
+   * @throws {MLInternalError} When canvas manager is not initialized
    */
   public get canvas(): HTMLCanvasElement {
     if (!this.canvasManager) {
@@ -349,8 +348,8 @@ export class DetectionController {
   }
 
   /**
-   * 2Dコンテキストの取得
-   * @throws {MLInternalError} キャンバスマネージャーが初期化されていない場合
+   * Get 2D context
+   * @throws {MLInternalError} When canvas manager is not initialized
    */
   public get canvasContext(): CanvasRenderingContext2D {
     if (!this.canvasManager) {
@@ -359,16 +358,15 @@ export class DetectionController {
     return this.canvasManager.ctx;
   }
 
-
   /**
-   * ビデオフレームからテンソルを作成し、YOLO推論を実行してキャンバス座標系の検出結果を返す
-   * メモリ管理を適切に行い、中間テンソルは確実に破棄する
+   * Create tensor from video frame, run YOLO inference, and return detection results in canvas coordinate system
+   * Manages memory appropriately and ensures intermediate tensors are disposed
    *
-   * @param cropX クロップ開始X座標（ピクセル単位）
-   * @param cropY クロップ開始Y座標（ピクセル単位）
-   * @param croppedWidth クロップ幅（ピクセル単位）
-   * @param croppedHeight クロップ高さ（ピクセル単位）
-   * @returns キャンバス座標系の検出結果とレターボックス情報
+   * @param cropX Crop start X coordinate (in pixels)
+   * @param cropY Crop start Y coordinate (in pixels)
+   * @param croppedWidth Crop width (in pixels)
+   * @param croppedHeight Crop height (in pixels)
+   * @returns Detection results and letterbox information in canvas coordinate system
    */
   private async preprocessVideoFrameAndPredict(
     cropX: number,
@@ -383,9 +381,9 @@ export class DetectionController {
     let letterboxTransformInfo: LetterboxInfo | undefined;
 
     try {
-      // tf.tidyで中間テンソルのメモリを自動管理
+      // Automatically manage memory for intermediate tensors with tf.tidy
       preprocessedInputTensor = tf.tidy(() => {
-        // ビデオフレームを正規化して指定領域をクロップ
+        // Normalize video frame and crop specified region
         const normalizedCroppedTensor = cropNormalizedVideoTensor(
           this.video,
           cropX,
@@ -394,7 +392,7 @@ export class DetectionController {
           croppedHeight
         );
 
-        // YOLOモデルの入力サイズに合わせてレターボックス変換
+        // Apply letterbox transformation to match YOLO model input size
         const {
           output: paddedTensor,
           letterboxInfo: letterboxTransformResult,
@@ -403,23 +401,23 @@ export class DetectionController {
           this.yoloInference.metadataInstance.imgsz
         );
 
-        // 座標変換に必要なクロップ情報を追加
+        // Add crop information needed for coordinate transformation
         letterboxTransformInfo = {
           ...letterboxTransformResult,
           croppedWidth,
           croppedHeight,
         };
 
-        // バッチ次元を追加してモデル入力形式に変換
+        // Add batch dimension and convert to model input format
         return paddedTensor.expandDims(0) as tf.Tensor4D;
       });
 
-      // letterboxTransformInfo の確認
+      // Verify letterboxTransformInfo
       if (!letterboxTransformInfo) {
         throw new MLInternalError("LETTERBOX_TRANSFORM_NOT_GENERATED");
       }
 
-      // YOLO推論とキャンバス座標系への変換
+      // YOLO inference and conversion to canvas coordinate system
       const detectionResults = await this.yoloInference.predict(
         preprocessedInputTensor,
         letterboxTransformInfo,
@@ -435,9 +433,9 @@ export class DetectionController {
   }
 
   /**
-   * キャッシュを利用したクロップ領域の取得
-   * ビデオとキャンバスサイズに変更がない場合はキャッシュされた値を返す
-   * @returns クロップ領域の座標と寸法
+   * Get crop region using cache
+   * Returns cached values if there are no changes to video and canvas sizes
+   * @returns Coordinates and dimensions of crop region
    */
   private getCachedCropRegion(): {
     cropX: number;
@@ -456,7 +454,7 @@ export class DetectionController {
       height: canvas.height,
     };
 
-    // キャッシュが有効かチェック（ビデオとキャンバス両方のサイズ）
+    // Check if cache is valid (both video and canvas sizes)
     if (
       this.cachedCropRegion &&
       this.lastVideoDimensions &&
@@ -469,7 +467,7 @@ export class DetectionController {
       return this.cachedCropRegion;
     }
 
-    // 新しく計算してキャッシュ
+    // Calculate new values and cache them
     this.cachedCropRegion = this.calculateCropRegion();
     this.lastVideoDimensions = currentVideoDimensions;
     this.lastCanvasDimensions = currentCanvasDimensions;
@@ -477,9 +475,9 @@ export class DetectionController {
   }
 
   /**
-   * ビデオとキャンバスのアスペクト比に基づくクロップ領域の計算
-   * アスペクト比の違いを調整して適切な領域を抽出
-   * @returns クロップ領域の座標と寸法
+   * Calculate crop region based on aspect ratios of video and canvas
+   * Adjusts for aspect ratio differences to extract appropriate region
+   * @returns Coordinates and dimensions of crop region
    */
   private calculateCropRegion(): {
     cropX: number;
@@ -493,17 +491,17 @@ export class DetectionController {
     const videoAspectRatio = video.videoWidth / video.videoHeight;
     const canvasAspectRatio = canvas.width / canvas.height;
 
-    // デフォルト（全体使用）
+    // Default (use entire area)
     let cropX = 0;
     let cropY = 0;
     let croppedWidth = video.videoWidth;
     let croppedHeight = video.videoHeight;
 
-    // 横長映像の場合
+    // For landscape video
     if (videoAspectRatio > canvasAspectRatio) {
       croppedWidth = video.videoHeight * canvasAspectRatio;
       cropX = (video.videoWidth - croppedWidth) / 2;
-      // 縦長映像の場合
+      // For portrait video
     } else if (videoAspectRatio < canvasAspectRatio) {
       croppedHeight = video.videoWidth / canvasAspectRatio;
       cropY = (video.videoHeight - croppedHeight) / 2;
@@ -513,39 +511,39 @@ export class DetectionController {
   }
 
   /**
-   * 全リソースの解放とメモリクリーンアップ
-   * カメラ、キャンバス、推論インスタンスを適切に破棄
+   * Release all resources and clean up memory
+   * Properly dispose of camera, canvas, and inference instances
    */
   public dispose(): void {
     this.detectionState = DetectionState.PAUSED;
 
-    // アニメーションフレームのキャンセル
+    // Cancel animation frame
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
 
-    // カメラ破棄
+    // Dispose camera
     if (this.cameraManager) {
       this.cameraManager.dispose();
       this.cameraManager = null;
     }
 
-    // キャンバス破棄
+    // Dispose canvas
     if (this.canvasManager) {
       this.canvasManager.dispose();
       this.canvasManager = null;
     }
 
-    // キャッシュクリア
+    // Clear cache
     this.cachedCropRegion = undefined;
     this.lastVideoDimensions = undefined;
     this.lastCanvasDimensions = undefined;
 
-    // 推論インスタンス破棄
+    // Dispose inference instance
     this.yoloInference.dispose();
 
-    // 最終メモリ状態
+    // Final memory state
     const memoryStats = tf.memory();
     console.info(
       `Disposed - Final memory state: ${memoryStats.numTensors} tensors, ${(
@@ -555,8 +553,8 @@ export class DetectionController {
   }
 
   /**
-   * TensorFlow.jsバックエンドの設定と初期化
-   * 指定されたバックエンド（webgl/webgpu/cpu等）を設定
+   * Configure and initialize TensorFlow.js backend
+   * Sets up specified backend (webgl/webgpu/cpu, etc.)
    */
   private async setupBackend(): Promise<void> {
     await tf.setBackend(this.backend);

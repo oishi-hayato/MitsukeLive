@@ -1,6 +1,6 @@
-/* MitsukeLive Example 共通スタイル */
+/* MitsukeLive Example Common Styles */
 
-/* リセット */
+/* Reset */
 * {
   margin: 0;
   padding: 0;
@@ -17,7 +17,7 @@ body {
   font-family: "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono", monospace;
 }
 
-/* メインアプリケーション */
+/* Main Application */
 .app {
   position: relative;
   width: 100vw;
@@ -25,7 +25,7 @@ body {
   background: #000;
 }
 
-/* カメラコンテナ */
+/* Camera Container */
 .camera {
   position: relative;
   width: 100%;
@@ -51,7 +51,7 @@ body {
   pointer-events: none;
 }
 
-/* メッセージ表示 */
+/* Message Display */
 .message {
   position: absolute;
   top: 20px;
@@ -68,7 +68,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* 情報パネル */
+/* Information Panel */
 .info {
   position: absolute;
   bottom: 20px;
@@ -123,7 +123,7 @@ body {
   }
 }
 
-/* ステータス表示 */
+/* Status Display */
 .status {
   font-weight: bold;
 }
@@ -133,7 +133,7 @@ body {
   font-weight: bold;
 }
 
-/* コントロールボタン */
+/* Control Buttons */
 .controls {
   position: absolute;
   top: 25px;
@@ -180,7 +180,7 @@ body {
 }
 
 
-/* アニメーション */
+/* Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -209,7 +209,7 @@ body {
   animation: fadeOut 0.3s ease-out;
 }
 
-/* レスポンシブ対応 */
+/* Responsive Design */
 @media (max-width: 480px) {
   .message,
   .info {
@@ -230,7 +230,7 @@ body {
   }
 }
 
-/* 3D関連 */
+/* 3D Related */
 .depth-indicator {
   position: absolute;
   background: rgba(0, 255, 136, 0.8);

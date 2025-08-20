@@ -1,5 +1,4 @@
 // Public API
-export { DetectionController } from "./lib/detection-controller";
 export type { ObjectDetectorOptions, Detection, ARDetection } from "./types";
 export type { MLClientError } from "./errors";
 export {

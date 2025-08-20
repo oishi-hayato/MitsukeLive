@@ -43,7 +43,7 @@ describe("YOLOInference", () => {
       );
 
       await expect(yoloEngine.initialize()).rejects.toThrow(
-        "モデルの読み込みに失敗しました"
+        "Failed to load model"
       );
     });
   });
@@ -64,7 +64,7 @@ describe("YOLOInference", () => {
       const mockTensor = {} as tf.Tensor4D;
 
       await expect(uninitializedEngine.predict(mockTensor)).rejects.toThrow(
-        "モデルが初期化されていません"
+        "Model not initialized"
       );
     });
 
@@ -93,7 +93,7 @@ describe("YOLOInference", () => {
 
       const result = await yoloEngine.predict(mockInputTensor);
 
-      // スコア閾値0.5以上の検出が4つ返される（0.9, 0.8, 0.7, 0.6）
+      // 4 detections returned with score threshold 0.5 or higher (0.9, 0.8, 0.7, 0.6)
       expect(result).toHaveLength(4);
       expect(result[0]).toMatchObject({
         boundingBox: [100, 150, 50, 30],
