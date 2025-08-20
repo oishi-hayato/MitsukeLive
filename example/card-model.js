@@ -87,20 +87,18 @@ export function createGlossyCard(
 
   const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
 
-  // Create glossy black glass material with gloss control
+  // Create optimized glossy black material (reduced complexity for better performance)
   const material = new THREE.MeshPhysicalMaterial({
     color: 0x000000, // Black color
-    metalness: 0.1, // Low metalness for glass-like appearance
-    roughness: Math.max(0.02, 0.1 - gloss * 0.08), // Very smooth for glass
-    reflectivity: Math.max(0.95, 0.95 + gloss * 0.05), // Very high reflectivity
-    clearcoat: Math.max(0.9, 0.9 + gloss * 0.1), // Strong clearcoat for glass effect
-    clearcoatRoughness: Math.max(0.01, 0.05 - gloss * 0.04), // Very smooth clearcoat
-    envMapIntensity: Math.max(2.0, 2.0 + gloss * 1.0), // Strong environment reflections
-    ior: 1.52, // Glass index of refraction
-    transmission: 0.9, // Glass transmission for see-through effect
-    thickness: 0.5, // Glass thickness for refraction
+    metalness: 0.2, // Moderate metalness
+    roughness: Math.max(0.05, 0.15 - gloss * 0.1), // Moderate smoothness
+    reflectivity: Math.max(0.8, 0.8 + gloss * 0.2), // Good reflectivity
+    clearcoat: Math.max(0.6, 0.6 + gloss * 0.4), // Moderate clearcoat
+    clearcoatRoughness: Math.max(0.05, 0.1 - gloss * 0.05), // Moderate clearcoat smoothness
+    envMapIntensity: Math.max(1.0, 1.0 + gloss * 0.5), // Reduced environment reflections
     opacity: opacity,
     transparent: opacity < 1.0,
+    // Remove expensive transmission and IOR for better performance
   });
 
   return new THREE.Mesh(geometry, material);
@@ -127,31 +125,19 @@ export function createDebugCube(size = 0.01, color = 0x00ff00) {
  * @param {THREE.Scene} scene - Three.js scene
  */
 export function setupSceneLighting(scene) {
-  // Minimal ambient light for strong contrast
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
+  // Optimized lighting setup with fewer lights for better performance
+
+  // Ambient light for basic illumination
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
   scene.add(ambientLight);
 
-  // Main light for front face highlights (shallow angle)
-  const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-  mainLight.position.set(0.5, 1, 2); // Very shallow angle for front reflection
+  // Single main directional light
+  const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  mainLight.position.set(0.5, 1, 2);
   scene.add(mainLight);
 
-  // Secondary light from opposite shallow angle
-  const counterLight = new THREE.DirectionalLight(0xffffff, 1.0);
-  counterLight.position.set(-0.5, 1, 2); // Mirror angle
-  scene.add(counterLight);
-
-  // Nearly perpendicular light for direct front highlights
-  const directLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directLight.position.set(0, 0.5, 1.5); // Almost straight on
-  scene.add(directLight);
-
-  // Point lights very close to card surface for guaranteed highlights
-  const leftHighlight = new THREE.PointLight(0xffffff, 0.4);
-  leftHighlight.position.set(-0.02, 0, -0.04); // Very close to left edge
-  scene.add(leftHighlight);
-
-  const rightHighlight = new THREE.PointLight(0xffffff, 0.4);
-  rightHighlight.position.set(0.02, 0, -0.04); // Very close to right edge
-  scene.add(rightHighlight);
+  // One point light for highlights
+  const highlight = new THREE.PointLight(0xffffff, 0.6);
+  highlight.position.set(0, 0.02, -0.03);
+  scene.add(highlight);
 }

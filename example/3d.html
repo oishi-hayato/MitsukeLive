@@ -1,4 +1,4 @@
-3<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -17,13 +17,10 @@
 
     <script type="module">
       import * as MitsukeLive from "../dist/index.js";
-      import { createGlossyCard, setupSceneLighting } from "./card-model.js";
 
       const { createApp, ref, onMounted, onUnmounted } = Vue;
 
       // Constants
-      const CAMERA_FOV = 50; // Camera field of view in degrees
-
       const MODEL_PATHS = {
         modelPath: "models/model.json",
         metadataPath: "models/metadata.yaml",
@@ -31,15 +28,14 @@
 
       const DETECTOR_OPTIONS = {
         detection: {
+          continuousDetection: true,
           scoreThreshold: 0.7, // Only detect objects with 70% or higher confidence
-          inferenceInterval: 16, // ~60 FPS detection (16ms interval)
         },
         threeDEstimation: {
           objectSize: {
             width: 0.02, // 2cm
             height: 0.02, // 2cm
           },
-          cameraFov: CAMERA_FOV,
         },
       };
 
@@ -66,28 +62,6 @@
           let renderer = null;
           let cubes = []; // Manage multiple objects
           let animationId = null;
-          let dynamicLights = []; // Lights that follow the card
-
-          // Smoothing variables for interpolation
-          let targetPosition = { x: 0, y: 0, z: -0.05 };
-          let targetRotation = { x: 0, y: 0, z: 0 };
-          let currentPosition = { x: 0, y: 0, z: -0.05 };
-          let currentRotation = { x: 0, y: 0, z: 0 };
-          const lerpFactor = 0.25; // Higher smoothing factor for faster response with higher FPS
-
-          // Card appearance animation variables
-          let cardAnimation = {
-            isPlaying: false,
-            startTime: 0,
-            duration: 1500, // 1.5 seconds
-            startScale: 0.1,
-            startOpacity: 0.0,
-            startY: -0.08, // Start below the target position
-            targetScale: 1.0,
-            targetOpacity: 0.7, // Glass opacity
-            targetY: -0.05, // Target position
-            hasPlayedOnce: false // Track if animation has been played
-          };
 
           // Initialize Three.js scene
           const initThreeJS = () => {
@@ -113,157 +87,83 @@
 
             // Create camera
             camera = new THREE.PerspectiveCamera(
-              CAMERA_FOV,
+              50,
               detectionCanvas.width / detectionCanvas.height,
-              0.01, // Near: 1cm
-              1000 // Far: 10m for long distance detection
+              0.1,
+              100
             );
             camera.position.z = 0;
 
-            // Create black glass card model using external module
-            const card = createGlossyCard(
-              0.02, // 20mm width
-              0.028, // 28mm height (20mm * 1.4 ratio)
-              0.0005, // 0.5mm thickness
-              0.002, // 2mm corner radius
-              0.7, // 70% opacity (more visible glass)
-              0.9 // 90% gloss level (very glossy glass)
-            );
-            card.visible = false;
-            cubes.push(card);
-            scene.add(card);
+            // Create multiple cubes (positioned around central object)
+            const cubeConfigs = [
+              {
+                color: 0x00ff88,
+                offsetX: 0,
+                offsetY: 0,
+                offsetZ: 0,
+                name: "center",
+              }, // center
+              {
+                color: 0xff0088,
+                offsetX: 0.02,
+                offsetY: 0,
+                offsetZ: 0,
+                name: "right",
+              }, // right
+              {
+                color: 0x0088ff,
+                offsetX: -0.02,
+                offsetY: 0,
+                offsetZ: 0,
+                name: "left",
+              }, // left
+              {
+                color: 0xffff00,
+                offsetX: 0,
+                offsetY: 0.02,
+                offsetZ: 0,
+                name: "top",
+              }, // top
+              {
+                color: 0xff8800,
+                offsetX: 0,
+                offsetY: -0.02,
+                offsetZ: 0,
+                name: "bottom",
+              }, // bottom
+            ];
 
-            // Set up scene lighting
-            setupSceneLighting(scene);
+            cubeConfigs.forEach((config, index) => {
+              const geometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+              const material = new THREE.MeshBasicMaterial({
+                color: config.color,
+                wireframe: true,
+                wireframeLinewidth: 5,
+              });
+              const cube = new THREE.Mesh(geometry, material);
+              cube.visible = false;
+              cube.userData = { ...config, index };
+              cubes.push(cube);
+              scene.add(cube);
+            });
 
-            // Add dynamic lights that will follow the card
-            const cardFollowLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-            const cardFollowLight2 = new THREE.PointLight(0xffffff, 0.6);
-            const cardFollowLight3 = new THREE.PointLight(0xaaccff, 0.3);
-
-            scene.add(cardFollowLight1);
-            scene.add(cardFollowLight2);
-            scene.add(cardFollowLight3);
-
-            dynamicLights.push(
-              cardFollowLight1,
-              cardFollowLight2,
-              cardFollowLight3
-            );
-          };
-
-          // Linear interpolation helper function
-          const lerp = (start, end, factor) => {
-            return start + (end - start) * factor;
+            // Add light
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
           };
 
           // Three.js animation loop
           const animate = () => {
             animationId = requestAnimationFrame(animate);
 
-            // Handle card appearance animation
-            if (cardAnimation.isPlaying && cubes.length > 0) {
-              const card = cubes[0];
-              const elapsed = Date.now() - cardAnimation.startTime;
-              const progress = Math.min(elapsed / cardAnimation.duration, 1.0);
-
-              // Easing function (ease-out)
-              const easeOut = 1 - Math.pow(1 - progress, 3);
-
-              // Animate scale
-              const currentScale =
-                cardAnimation.startScale +
-                (cardAnimation.targetScale - cardAnimation.startScale) *
-                  easeOut;
-              card.scale.set(currentScale, currentScale, currentScale);
-
-              // Animate opacity
-              const currentOpacity =
-                cardAnimation.startOpacity +
-                (cardAnimation.targetOpacity - cardAnimation.startOpacity) *
-                  easeOut;
-              card.material.opacity = currentOpacity;
-              card.material.transparent = true;
-
-              // Animate Y position (bottom to top movement)
-              const currentY =
-                cardAnimation.startY +
-                (cardAnimation.targetY - cardAnimation.startY) * easeOut;
-              card.position.z = currentY;
-
-              // Animation complete
-              if (progress >= 1.0) {
-                cardAnimation.isPlaying = false;
-                cardAnimation.hasPlayedOnce = true; // Mark animation as completed
-                card.material.transparent = currentOpacity < 1.0;
-                // Initialize position for smooth interpolation after animation
-                currentPosition.x = card.position.x;
-                currentPosition.y = card.position.y;
-                currentPosition.z = card.position.z;
+            // Rotate visible cubes
+            cubes.forEach((cube) => {
+              if (cube.visible) {
+                cube.rotation.x += 0.01;
+                cube.rotation.y += 0.01;
               }
+            });
 
-              // Update dynamic lights during animation
-              updateDynamicLights(card);
-            }
-            // Smooth interpolation for card position and rotation (only when not animating)
-            else if (
-              cubes.length > 0 &&
-              cubes[0].visible &&
-              !cardAnimation.isPlaying
-            ) {
-              const card = cubes[0];
-
-              // Interpolate position
-              currentPosition.x = lerp(
-                currentPosition.x,
-                targetPosition.x,
-                lerpFactor
-              );
-              currentPosition.y = lerp(
-                currentPosition.y,
-                targetPosition.y,
-                lerpFactor
-              );
-              currentPosition.z = lerp(
-                currentPosition.z,
-                targetPosition.z,
-                lerpFactor
-              );
-
-              // Interpolate rotation
-              currentRotation.x = lerp(
-                currentRotation.x,
-                targetRotation.x,
-                lerpFactor
-              );
-              currentRotation.y = lerp(
-                currentRotation.y,
-                targetRotation.y,
-                lerpFactor
-              );
-              currentRotation.z = lerp(
-                currentRotation.z,
-                targetRotation.z,
-                lerpFactor
-              );
-
-              // Apply smoothed values to card
-              card.position.set(
-                currentPosition.x,
-                currentPosition.y,
-                currentPosition.z
-              );
-              card.rotation.set(
-                currentRotation.x,
-                currentRotation.y,
-                currentRotation.z
-              );
-
-              // Update dynamic lights with smoothed position and rotation
-              updateDynamicLights(card);
-            }
-
-            // Just render the scene
             if (renderer && scene && camera) {
               renderer.render(scene, camera);
             }
@@ -273,160 +173,84 @@
           const update3DObject = (detection) => {
             if (cubes.length === 0 || !camera || !renderer) return;
 
-            // Use position3D from library calculation if available
-            const basePosition = detection.position3D || {
-              x: 0,
-              y: 0,
-              z: -detection.depth,
-            };
+            const [x, y, width, height] = detection.boundingBox;
+            const detectionCanvas = document.getElementById("canvas");
+            const canvasWidth = detectionCanvas.width;
+            const canvasHeight = detectionCanvas.height;
 
-            // Update card position and scale
-            const card = cubes[0]; // Single card model
+            // Calculate center coordinates of detection box
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
 
-            // Debug: log the position3D values
-            console.log("basePosition:", basePosition);
-            console.log("detection.depth:", detection.depth);
+            // Convert to Three.js world coordinates
+            // Coordinate transformation considering camera FOV and aspect ratio
+            const aspect = canvasWidth / canvasHeight;
+            const fov = (camera.fov * Math.PI) / 180; // Convert to radians
+            const depth = detection.depth;
 
-            // Apply position stabilization for close objects
-            const stabilizationDistance = 0.3; // 30cm threshold
-            const stabilizationFactor = Math.min(
-              detection.depth / stabilizationDistance,
-              1.0
-            );
+            // Calculate view width and height from FOV
+            const viewHeight = 2 * Math.tan(fov / 2) * depth;
+            const viewWidth = viewHeight * aspect;
 
-            // Smooth X and Y positions for close objects
-            const stabilizedX = basePosition.x * stabilizationFactor;
-            const stabilizedY = basePosition.y * stabilizationFactor;
+            // Convert to normalized coordinates (-1 to 1)
+            const normalizedX = (centerX / canvasWidth) * 2 - 1;
+            const normalizedY = -((centerY / canvasHeight) * 2 - 1); // Flip Y axis
 
-            // Set card position with stabilization
-            const offsetZ = 0.05;
-            const finalX = stabilizedX;
-            const finalY = stabilizedY;
-            const finalZ = basePosition.z + offsetZ;
+            // Convert to world coordinates
+            const worldX = normalizedX * (viewWidth / 2);
+            const worldY = normalizedY * (viewHeight / 2);
+            const worldZ = -depth; // Direction away from camera
 
-            console.log(
-              "Stabilization factor:",
-              stabilizationFactor.toFixed(3)
-            );
+            // Set relative position for each cube
+            cubes.forEach((cube, index) => {
+              const config = cube.userData;
 
-            console.log("Final position:", finalX, finalY, finalZ);
+              // Add offset to base position
+              const posX = worldX + config.offsetX;
+              const posY = worldY + config.offsetY;
+              const posZ = worldZ + config.offsetZ;
 
-            // Update target position for smooth interpolation (but keep detection-based updates)
-            targetPosition.x = finalX;
-            targetPosition.y = finalY;
-            targetPosition.z = finalZ;
+              cube.position.set(posX, posY, posZ);
 
-            // Apply orientation (pitch and roll) to target rotation for smooth interpolation
-            if (detection.orientation) {
-              const pitchRad =
-                ((detection.orientation.pitch || 0) * Math.PI) / 180;
-              const rollRad =
-                ((detection.orientation.roll || 0) * Math.PI) / 180;
+              // Scale calculation (based on depth - closer objects appear larger)
+              const baseScale = index === 0 ? 0.15 : 0.1; // Center cube slightly larger
+              const scale = baseScale / Math.max(depth, 0.1); // Closer objects larger, prevent division by zero
+              cube.scale.set(scale, scale, scale);
 
-              // Update target rotations for smooth interpolation
-              targetRotation.x = pitchRad;
-              targetRotation.z = rollRad;
-              targetRotation.y = 0; // Keep Y rotation at 0 for natural look
-
-              console.log(
-                "Target rotations - Pitch:",
-                detection.orientation.pitch,
-                "Roll:",
-                detection.orientation.roll
-              );
-            } else {
-              // Reset target rotation if no orientation data
-              targetRotation.x = 0;
-              targetRotation.y = 0;
-              targetRotation.z = 0;
-            }
-
-            // Simple fixed scale for all distances
-            const scale = 1.0; // Double the scale
-
-            console.log("Distance:", Math.abs(finalZ), "Fixed Scale:", scale);
-            card.scale.set(scale, scale, scale);
-
-            // Note: Dynamic lights and final position/rotation are now handled in animate() loop for smoothness
-
-            // Start appearance animation only on first detection
-            if (!card.visible) {
-              card.visible = true;
-              // Only play animation if it hasn't been played before
-              if (!cardAnimation.hasPlayedOnce) {
-                cardAnimation.isPlaying = true;
-                cardAnimation.startTime = Date.now();
-                // Set initial animation state
-                card.scale.set(cardAnimation.startScale, cardAnimation.startScale, cardAnimation.startScale);
-                card.material.opacity = cardAnimation.startOpacity;
-                card.material.transparent = true;
-                card.position.z = cardAnimation.startY; // Start from bottom
+              // Smooth display animation
+              if (!cube.visible) {
+                cube.visible = true;
+                // Animation starting small and expanding (with time delay)
+                setTimeout(() => {
+                  cube.scale.set(scale * 0.1, scale * 0.1, scale * 0.1);
+                  const targetScale = scale;
+                  const animateScale = () => {
+                    const currentScale = cube.scale.x;
+                    if (currentScale < targetScale * 0.95) {
+                      const newScale = currentScale * 1.1;
+                      cube.scale.set(newScale, newScale, newScale);
+                      requestAnimationFrame(animateScale);
+                    } else {
+                      cube.scale.set(targetScale, targetScale, targetScale);
+                    }
+                  };
+                  animateScale();
+                }, index * 100); // Sequential display at 100ms intervals
               } else {
-                // If animation has played before, set normal state immediately
-                card.scale.set(cardAnimation.targetScale, cardAnimation.targetScale, cardAnimation.targetScale);
-                card.material.opacity = cardAnimation.targetOpacity;
-                card.material.transparent = cardAnimation.targetOpacity < 1.0;
+                // Simply set scale if already displayed
+                cube.scale.set(scale, scale, scale);
               }
-            }
-          };
-
-          // Update dynamic lights to follow card rotation
-          const updateDynamicLights = (card) => {
-            if (dynamicLights.length === 0 || !card.visible) return;
-
-            const cardPos = card.position;
-            const cardRot = card.rotation;
-
-            // Light 1: Directional light that maintains angle relative to card
-            const light1 = dynamicLights[0];
-            if (light1) {
-              // Create a vector pointing from card surface
-              const lightDirection = new THREE.Vector3(1, 1, 2);
-              // Rotate the direction based on card rotation
-              lightDirection.applyEuler(cardRot);
-              lightDirection.add(cardPos);
-              light1.position.copy(lightDirection);
-              light1.target.position.copy(cardPos);
-              light1.target.updateMatrixWorld();
-            }
-
-            // Light 2: Point light that stays close to card
-            const light2 = dynamicLights[1];
-            if (light2) {
-              const lightOffset = new THREE.Vector3(0.02, 0.02, 0.01);
-              lightOffset.applyEuler(cardRot);
-              light2.position.copy(cardPos).add(lightOffset);
-            }
-
-            // Light 3: Accent light from opposite side
-            const light3 = dynamicLights[2];
-            if (light3) {
-              const lightOffset = new THREE.Vector3(-0.015, 0.01, 0.015);
-              lightOffset.applyEuler(cardRot);
-              light3.position.copy(cardPos).add(lightOffset);
-            }
+            });
           };
 
           // Format detection information
-          const formatDetectionInfo = (detection) => {
-            if (!detection) return null;
-
-            return {
-              score: (detection.score * 100).toFixed(1),
-              depth: detection.depth?.toFixed(3) || "0.000",
-              pitch: detection.orientation?.pitch?.toFixed(1) || "0.0",
-              roll: detection.orientation?.roll?.toFixed(1) || "0.0",
-              box: detection.boundingBox?.map((v) => Math.round(v)) || [
-                0, 0, 0, 0,
-              ],
-              centerX: detection.center2D?.x
-                ? Math.round(detection.center2D.x)
-                : 0,
-              centerY: detection.center2D?.y
-                ? Math.round(detection.center2D.y)
-                : 0,
-            };
-          };
+          const formatDetectionInfo = (detection) => ({
+            score: (detection.score * 100).toFixed(1),
+            depth: detection.depth.toFixed(3),
+            pitch: detection.orientation.pitch.toFixed(1),
+            roll: detection.orientation.roll.toFixed(1),
+            box: detection.boundingBox.map((v) => Math.round(v)),
+          });
 
           // Handle detection
           const handleDetection = (detection) => {
@@ -437,8 +261,8 @@
               update3DObject(detection);
             } else {
               state.detectionInfo.value = null;
-              cubes.forEach((model) => {
-                model.visible = false;
+              cubes.forEach((cube) => {
+                cube.visible = false;
               });
             }
           };
@@ -486,8 +310,8 @@
               state.isDetecting.value = false;
               state.status.value = MESSAGES.PAUSED;
               state.detectionInfo.value = null;
-              cubes.forEach((model) => {
-                model.visible = false;
+              cubes.forEach((cube) => {
+                cube.visible = false;
               });
             } else {
               detector.resume();
@@ -557,12 +381,8 @@
                   <span class="info__value monospace">{{ detectionInfo.roll }}°</span>
                 </div>
                 <div class="info__item">
-                  <span class="info__label">BBox:</span>
+                  <span class="info__label">Position:</span>
                   <span class="info__value monospace">[{{ detectionInfo.box.join(', ') }}]</span>
-                </div>
-                <div class="info__item">
-                  <span class="info__label">Center:</span>
-                  <span class="info__value monospace">({{ detectionInfo.centerX }}, {{ detectionInfo.centerY }})</span>
                 </div>
               </div>
             </div>
