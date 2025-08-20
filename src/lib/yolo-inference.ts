@@ -10,17 +10,17 @@ import type {
 import { transformToCanvas, findValidDetections } from "../helpers/yolo-helper";
 
 /**
- * YOLO推論インスタンス
- * TensorFlow.jsを使ったリアルタイム物体検出
+ * YOLO Inference Instance
+ * Real-time object detection using TensorFlow.js
  */
 export class YOLOInference {
-  private model: tf.GraphModel | null = null; // 読み込み済みのYOLOモデル
-  private metadata: YOLOMetadata | null = null; // モデルのメタデータ情報
-  private scoreThreshold: number; // 検出の最低信頼度スコア
-  private memoryThreshold: number; // メモリクリーンアップの閾値
+  private model: tf.GraphModel | null = null; // Loaded YOLO model
+  private metadata: YOLOMetadata | null = null; // Model metadata information
+  private scoreThreshold: number; // Minimum confidence score for detection
+  private memoryThreshold: number; // Memory cleanup threshold
 
   /**
-   * YOLO推論の設定
+   * YOLO inference configuration
    */
   constructor(private options: YOLOInferenceOptions) {
     this.scoreThreshold = options.scoreThreshold || 0.7;
@@ -28,7 +28,7 @@ export class YOLOInference {
   }
 
   /**
-   * 推論エンジンの初期化（メタデータ → モデル読み込み）
+   * Initialize inference engine (metadata → model loading)
    */
   public async initialize(): Promise<void> {
     await this.loadMetadata();
@@ -36,7 +36,7 @@ export class YOLOInference {
   }
 
   /**
-   * 物体検出の実行
+   * Execute object detection
    */
   public async predict(
     imageTensor: tf.Tensor4D,
@@ -51,7 +51,7 @@ export class YOLOInference {
     try {
       let predictions = this.processRawPredictions(results);
 
-      // 座標変換
+      // Coordinate transformation
       if (letterboxInfo && canvasElement) {
         predictions = transformToCanvas(
           predictions,
@@ -68,8 +68,8 @@ export class YOLOInference {
   }
 
   /**
-   * メタデータの取得
-   * @throws {MLInternalError} メタデータが初期化されていない場合
+   * Get metadata
+   * @throws {MLInternalError} When metadata is not initialized
    */
   public get metadataInstance(): YOLOMetadata {
     if (!this.metadata) {
@@ -79,8 +79,8 @@ export class YOLOInference {
   }
 
   /**
-   * モデルインスタンスの取得
-   * @throws {MLInternalError} モデルが初期化されていない場合
+   * Get model instance
+   * @throws {MLInternalError} When model is not initialized
    */
   public get modelInstance(): tf.GraphModel {
     if (!this.model) {
@@ -90,7 +90,7 @@ export class YOLOInference {
   }
 
   /**
-   * リソースの解放
+   * Release resources
    */
   public dispose(): void {
     if (this.model) {
@@ -100,7 +100,7 @@ export class YOLOInference {
   }
 
   /**
-   * メタデータファイルの読み込み
+   * Load metadata file
    */
   private async loadMetadata(): Promise<void> {
     try {
@@ -113,7 +113,7 @@ export class YOLOInference {
   }
 
   /**
-   * YOLOモデルの読み込み
+   * Load YOLO model
    */
   private async loadModel(): Promise<void> {
     try {
@@ -124,7 +124,7 @@ export class YOLOInference {
   }
 
   /**
-   * 予測結果の後処理
+   * Post-process prediction results
    */
   private processRawPredictions(results: tf.Tensor): Detection[] {
     const squeezed = results.squeeze();
@@ -147,7 +147,7 @@ export class YOLOInference {
   }
 
   /**
-   * メモリ使用量の監視とクリーンアップ
+   * Monitor memory usage and cleanup
    */
   public logMemoryUsage(): void {
     const memoryInfo = tf.memory();
@@ -168,7 +168,7 @@ export class YOLOInference {
   }
 
   /**
-   * メモリクリーンアップの実行
+   * Execute memory cleanup
    */
   private cleanupMemory(): void {
     tf.disposeVariables();

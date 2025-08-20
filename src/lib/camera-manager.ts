@@ -1,7 +1,7 @@
 import { MLInternalError } from "../errors";
 
 /**
- * カメラの設定とリサイズ管理を行うクラス
+ * Class for camera configuration and resize management
  */
 export class CameraManager {
   private videoElement: HTMLVideoElement;
@@ -13,7 +13,7 @@ export class CameraManager {
   }
 
   /**
-   * カメラストリームを設定します
+   * Set up camera stream
    */
   static async setup(
     videoElementId: string,
@@ -35,7 +35,7 @@ export class CameraManager {
     videoElement.playsInline = true;
     videoElement.muted = true;
 
-    // ビデオサイズ更新関数
+    // Video size update function
     const updateVideoSize = () => {
       const parent = videoElement.parentElement;
       if (parent) {
@@ -56,7 +56,7 @@ export class CameraManager {
         updateVideoSize();
         const cameraManager = new CameraManager(videoElement);
 
-        // リサイズ時のパフォーマンス最適化
+        // Performance optimization for resize events
         cameraManager.handleResize = () => {
           if (cameraManager.resizeTimeout) {
             clearTimeout(cameraManager.resizeTimeout);
@@ -78,7 +78,7 @@ export class CameraManager {
   }
 
   dispose(): void {
-    // リサイズ関連のクリーンアップ
+    // Clean up resize-related resources
     if (this.resizeTimeout) {
       clearTimeout(this.resizeTimeout);
       this.resizeTimeout = null;

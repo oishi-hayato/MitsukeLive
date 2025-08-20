@@ -1,7 +1,7 @@
 import { MLInternalError } from "../errors";
 
 /**
- * キャンバスの設定とリサイズ管理を行うクラス
+ * Class for canvas configuration and resize management
  */
 export class CanvasManager {
   private canvas: HTMLCanvasElement;
@@ -18,7 +18,7 @@ export class CanvasManager {
   }
 
   /**
-   * キャンバス要素を設定します
+   * Set up canvas element
    */
   static setup(canvasElementId: string): CanvasManager {
     const element = document.getElementById(canvasElementId);
@@ -38,7 +38,7 @@ export class CanvasManager {
       throw new MLInternalError("FAILED_TO_GET_2D_CONTEXT");
     }
 
-    // キャンバスサイズ更新関数
+    // Canvas size update function
     const updateCanvasSize = () => {
       const parent = canvas.parentElement;
       if (parent) {
@@ -52,7 +52,7 @@ export class CanvasManager {
     updateCanvasSize();
     const canvasManager = new CanvasManager(canvas, context);
 
-    // リサイズ時のパフォーマンス最適化
+    // Performance optimization for resize events
     canvasManager.handleResize = () => {
       if (canvasManager.resizeTimeout) {
         clearTimeout(canvasManager.resizeTimeout);
@@ -76,7 +76,7 @@ export class CanvasManager {
   }
 
   dispose(): void {
-    // リサイズ関連のクリーンアップ
+    // Clean up resize-related resources
     if (this.resizeTimeout) {
       clearTimeout(this.resizeTimeout);
       this.resizeTimeout = null;
