@@ -59,8 +59,6 @@ export class DetectionController {
 
   private threeDOptions?: ObjectDetectorOptions["threeDEstimation"]; // 3D estimation options
 
-  // Continuous detection settings
-  private continuousDetection: boolean; // Whether to enable continuous detection mode
 
   /**
    * Controller initial configuration
@@ -93,8 +91,6 @@ export class DetectionController {
     this.enable3D = !!options.threeDEstimation;
     this.threeDOptions = options.threeDEstimation;
 
-    // Continuous detection configuration
-    this.continuousDetection = options.detection?.continuousDetection || false;
   }
 
   /**
@@ -261,25 +257,22 @@ export class DetectionController {
 
       // Add 3D information if 3D estimation is enabled and settings are configured
       if (this.enable3D && this.threeDOptions) {
+        const cameraFov = this.threeDOptions.cameraFov ?? 50; // Default FOV for common webcams and Three.js compatibility
         result = add3DToDetection(
           result,
           this.canvas.width,
-          this.threeDOptions.objectSize
+          this.threeDOptions.objectSize,
+          this.canvas.width,
+          this.canvas.height,
+          cameraFov
         ) as ARDetection;
       }
 
       // Notify highest score detection result
       this.onDetection(result);
-
-      // Pause only if not in continuous detection mode
-      if (!this.continuousDetection) {
-        this.pause();
-      }
     } else {
-      // In continuous detection mode, also notify when no detection was made
-      if (this.continuousDetection) {
-        this.onDetection(null);
-      }
+      // Notify when no detection was made
+      this.onDetection(null);
     }
   }
 

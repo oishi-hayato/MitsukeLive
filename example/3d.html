@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+3<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -21,6 +21,8 @@
       const { createApp, ref, onMounted, onUnmounted } = Vue;
 
       // Constants
+      const CAMERA_FOV = 50; // Camera field of view in degrees
+
       const MODEL_PATHS = {
         modelPath: "models/model.json",
         metadataPath: "models/metadata.yaml",
@@ -28,7 +30,6 @@
 
       const DETECTOR_OPTIONS = {
         detection: {
-          continuousDetection: true,
           scoreThreshold: 0.7, // Only detect objects with 70% or higher confidence
         },
         threeDEstimation: {
@@ -36,6 +37,7 @@
             width: 0.02, // 2cm
             height: 0.02, // 2cm
           },
+          cameraFov: CAMERA_FOV,
         },
       };
 
@@ -87,7 +89,7 @@
 
             // Create camera
             camera = new THREE.PerspectiveCamera(
-              50,
+              CAMERA_FOV,
               detectionCanvas.width / detectionCanvas.height,
               0.1,
               100
@@ -173,42 +175,21 @@
           const update3DObject = (detection) => {
             if (cubes.length === 0 || !camera || !renderer) return;
 
-            const [x, y, width, height] = detection.boundingBox;
-            const detectionCanvas = document.getElementById("canvas");
-            const canvasWidth = detectionCanvas.width;
-            const canvasHeight = detectionCanvas.height;
-
-            // Calculate center coordinates of detection box
-            const centerX = x + width / 2;
-            const centerY = y + height / 2;
-
-            // Convert to Three.js world coordinates
-            // Coordinate transformation considering camera FOV and aspect ratio
-            const aspect = canvasWidth / canvasHeight;
-            const fov = (camera.fov * Math.PI) / 180; // Convert to radians
-            const depth = detection.depth;
-
-            // Calculate view width and height from FOV
-            const viewHeight = 2 * Math.tan(fov / 2) * depth;
-            const viewWidth = viewHeight * aspect;
-
-            // Convert to normalized coordinates (-1 to 1)
-            const normalizedX = (centerX / canvasWidth) * 2 - 1;
-            const normalizedY = -((centerY / canvasHeight) * 2 - 1); // Flip Y axis
-
-            // Convert to world coordinates
-            const worldX = normalizedX * (viewWidth / 2);
-            const worldY = normalizedY * (viewHeight / 2);
-            const worldZ = -depth; // Direction away from camera
+            // Use position3D from library calculation if available
+            const basePosition = detection.position3D || {
+              x: 0,
+              y: 0,
+              z: -detection.depth,
+            };
 
             // Set relative position for each cube
             cubes.forEach((cube, index) => {
               const config = cube.userData;
 
               // Add offset to base position
-              const posX = worldX + config.offsetX;
-              const posY = worldY + config.offsetY;
-              const posZ = worldZ + config.offsetZ;
+              const posX = basePosition.x + config.offsetX;
+              const posY = basePosition.y + config.offsetY;
+              const posZ = basePosition.z + config.offsetZ;
 
               cube.position.set(posX, posY, posZ);
 
@@ -250,6 +231,8 @@
             pitch: detection.orientation.pitch.toFixed(1),
             roll: detection.orientation.roll.toFixed(1),
             box: detection.boundingBox.map((v) => Math.round(v)),
+            centerX: Math.round(detection.center2D.x),
+            centerY: Math.round(detection.center2D.y),
           });
 
           // Handle detection
@@ -381,8 +364,12 @@
                   <span class="info__value monospace">{{ detectionInfo.roll }}°</span>
                 </div>
                 <div class="info__item">
-                  <span class="info__label">Position:</span>
+                  <span class="info__label">BBox:</span>
                   <span class="info__value monospace">[{{ detectionInfo.box.join(', ') }}]</span>
+                </div>
+                <div class="info__item">
+                  <span class="info__label">Center:</span>
+                  <span class="info__value monospace">({{ detectionInfo.centerX }}, {{ detectionInfo.centerY }})</span>
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import { MLInternalError } from "../errors";
 import { Detection, ARDetection } from "../types";
+import { convertToThreeJSSpaceCoordinates } from "./position-helper";
 
 // Constants
 const CONSISTENCY_EPS = 0.25; // 25% tolerance for width/height-based depth agreement
@@ -174,7 +175,10 @@ function estimateOrientation(
 export function add3DToDetection(
   detection: Detection,
   imageWidth: number,
-  objectSize: { width: number; height: number }
+  objectSize: { width: number; height: number },
+  canvasWidth?: number,
+  canvasHeight?: number,
+  cameraFov?: number
 ): ARDetection {
   const info = estimate3DInfo(
     detection.boundingBox,
@@ -183,9 +187,23 @@ export function add3DToDetection(
     detection.angle
   );
 
+  // Calculate 3D space coordinates if canvas and camera info are provided
+  let position3D = undefined;
+  if (canvasWidth && canvasHeight && cameraFov) {
+    position3D = convertToThreeJSSpaceCoordinates(
+      detection.center2D.x,
+      detection.center2D.y,
+      canvasWidth,
+      canvasHeight,
+      info.depth,
+      cameraFov
+    );
+  }
+
   return {
     ...detection,
     depth: info.depth,
     orientation: info.orientation,
+    position3D,
   };
 }

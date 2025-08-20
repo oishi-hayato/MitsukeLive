@@ -8,6 +8,11 @@ export interface Detection {
   angle: number;
   /** Confidence score (0.0-1.0) */
   score: number;
+  /** 2D center position calculated from bounding box */
+  center2D: {
+    x: number; // Center X coordinate in canvas pixels
+    y: number; // Center Y coordinate in canvas pixels
+  };
 }
 
 /**
@@ -21,6 +26,12 @@ export interface ARDetection extends Detection {
     pitch: number; // Up-down tilt (-90 to 90 degrees)
     roll: number; // Left-right tilt (-180 to 180 degrees)
   };
+  /** 3D space coordinates for Three.js rendering */
+  position3D?: {
+    x: number; // Space X coordinate
+    y: number; // Space Y coordinate
+    z: number; // Space Z coordinate
+  };
 }
 
 /**
@@ -33,8 +44,6 @@ export interface ObjectDetectorOptions {
     inferenceInterval?: number;
     /** Minimum confidence score for detection. Default: 0.7 */
     scoreThreshold?: number;
-    /** Enable continuous detection mode (don't pause after detection) */
-    continuousDetection?: boolean;
   };
 
   /** 3D estimation settings */
@@ -116,4 +125,6 @@ export interface ThreeDEstimationOptions {
     width: number;
     height: number;
   };
+  /** Camera field of view in degrees (default: 50) */
+  cameraFov?: number;
 }

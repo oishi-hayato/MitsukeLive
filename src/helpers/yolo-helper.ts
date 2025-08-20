@@ -1,6 +1,8 @@
 import type * as tf from "@tensorflow/tfjs";
 import type { LetterboxInfo, Detection } from "../types";
 import { MLInternalError } from "../errors";
+import { convertRadiansToDegrees } from "./math-helper";
+import { calculate2DCenter } from "./position-helper";
 
 // Type aliases
 type BoundingBox = [number, number, number, number];
@@ -8,21 +10,6 @@ type Rect = { x: number; y: number; width: number; height: number };
 type PaddingList = [[number, number], [number, number], [number, number]];
 
 // Constants
-const RADIANS_TO_DEGREES = 180 / Math.PI;
-
-/**
- * Convert radians to degrees
- *
- * @param radians - Radian value (finite numbers only. NaN, Infinity, -Infinity are invalid)
- * @returns Degree value (radian value × 180 / π)
- */
-export function convertRadiansToDegrees(radians: number): number {
-  if (!Number.isFinite(radians)) {
-    throw new MLInternalError("INVALID_RADIAN_VALUE", false);
-  }
-
-  return radians * RADIANS_TO_DEGREES;
-}
 
 /**
  * Scale calculation with aspect ratio preservation
@@ -349,11 +336,14 @@ export function transformToCanvas(
         canvasRect.width,
         canvasRect.height,
       ];
+      
+      const center2D = calculate2DCenter(canvasBBox);
 
       validTransformedPredictions.push({
         boundingBox: canvasBBox,
         angle: convertRadiansToDegrees(angle),
         score,
+        center2D,
       });
     } catch (error) {
       // Skip and continue on coordinate transformation error
@@ -441,10 +431,13 @@ export function findValidDetections(
     }
 
     const detectionBBox: BoundingBox = [x, y, width, height];
+    const center2D = calculate2DCenter(detectionBBox);
+    
     validDetections.push({
       boundingBox: detectionBBox,
       angle,
       score,
+      center2D,
     });
   }
 

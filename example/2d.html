@@ -56,6 +56,8 @@
           const formatDetectionInfo = (detection) => ({
             score: (detection.score * 100).toFixed(1),
             box: detection.boundingBox.map((v) => Math.round(v)),
+            centerX: Math.round(detection.center2D.x),
+            centerY: Math.round(detection.center2D.y),
           });
 
           // Handle detection
@@ -73,7 +75,8 @@
                 FLASH_CONFIG
               );
 
-              // Update state after detection completion
+              // Pause detection and update state
+              detector.pause();
               state.isDetecting.value = false;
               state.status.value = MESSAGES.DETECTION_COMPLETE;
             }
@@ -172,8 +175,12 @@
                   <span class="info__value monospace">{{ detectionInfo.score }}%</span>
                 </div>
                 <div class="info__item">
-                  <span class="info__label">Position:</span>
+                  <span class="info__label">BBox:</span>
                   <span class="info__value monospace">[{{ detectionInfo.box.join(', ') }}]</span>
+                </div>
+                <div class="info__item">
+                  <span class="info__label">Center:</span>
+                  <span class="info__value monospace">({{ detectionInfo.centerX }}, {{ detectionInfo.centerY }})</span>
                 </div>
               </div>
             </div>
