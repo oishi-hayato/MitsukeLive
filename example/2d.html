@@ -53,12 +53,22 @@
           let detector = null;
 
           // Format detection information
-          const formatDetectionInfo = (detection) => ({
-            score: (detection.score * 100).toFixed(1),
-            box: detection.boundingBox.map((v) => Math.round(v)),
-            centerX: Math.round(detection.center2D.x),
-            centerY: Math.round(detection.center2D.y),
-          });
+          const formatDetectionInfo = (detection) => {
+            if (!detection) return null;
+
+            return {
+              score: (detection.score * 100).toFixed(1),
+              box: detection.boundingBox?.map((v) => Math.round(v)) || [
+                0, 0, 0, 0,
+              ],
+              centerX: detection.center2D?.x
+                ? Math.round(detection.center2D.x)
+                : 0,
+              centerY: detection.center2D?.y
+                ? Math.round(detection.center2D.y)
+                : 0,
+            };
+          };
 
           // Handle detection
           const handleDetection = async (detection) => {

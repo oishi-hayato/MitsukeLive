@@ -59,7 +59,6 @@ export class DetectionController {
 
   private threeDOptions?: ObjectDetectorOptions["threeDEstimation"]; // 3D estimation options
 
-
   /**
    * Controller initial configuration
    * @param modelPath Path to TensorFlow.js model file
@@ -90,7 +89,6 @@ export class DetectionController {
     // 3D estimation configuration
     this.enable3D = !!options.threeDEstimation;
     this.threeDOptions = options.threeDEstimation;
-
   }
 
   /**

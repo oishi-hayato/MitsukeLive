@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Card Display Sample</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        font-family: Arial, sans-serif;
+        overflow: hidden;
+      }
+
+      #container {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #canvas {
+        flex: 1;
+      }
+
+      .controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        min-width: 250px;
+      }
+
+      .status-display {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        min-width: 200px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+
+      .status-title {
+        font-weight: bold;
+        margin-bottom: 10px;
+        font-size: 14px;
+      }
+
+      .status-item {
+        margin-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .status-label {
+        color: #ccc;
+      }
+
+      .status-value {
+        color: #fff;
+        font-weight: bold;
+      }
+
+      .control-group {
+        margin-bottom: 15px;
+      }
+
+      .control-group:last-child {
+        margin-bottom: 0;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+      }
+
+      select,
+      input[type="range"] {
+        width: 100%;
+        padding: 5px;
+        margin-bottom: 5px;
+      }
+
+      .range-value {
+        font-size: 12px;
+        color: #ccc;
+        text-align: right;
+      }
+
+      button {
+        background: #007acc;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+        margin-bottom: 5px;
+      }
+
+      button:hover {
+        background: #005a99;
+      }
+    </style>
+    <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+  </head>
+  <body>
+    <div id="container">
+      <canvas id="canvas"></canvas>
+
+      <div class="controls">
+        <h3>3D Card Display</h3>
+
+        <div class="control-group">
+          <label for="cardType">Card Type:</label>
+          <select id="cardType">
+            <option value="simple">Simple Card</option>
+            <option value="glossy">Glossy Card</option>
+            <option value="debug">Debug Cube</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="cardSize">Size:</label>
+          <input
+            type="range"
+            id="cardSize"
+            min="0.005"
+            max="0.05"
+            step="0.005"
+            value="0.02"
+          />
+          <div class="range-value" id="cardSizeValue">20mm</div>
+        </div>
+
+        <div class="control-group">
+          <label for="cardThickness">Thickness:</label>
+          <input
+            type="range"
+            id="cardThickness"
+            min="0.0001"
+            max="0.003"
+            step="0.0001"
+            value="0.0005"
+          />
+          <div class="range-value" id="cardThicknessValue">0.5mm</div>
+        </div>
+
+        <div class="control-group">
+          <label for="cardOpacity">Opacity:</label>
+          <input
+            type="range"
+            id="cardOpacity"
+            min="0.1"
+            max="1.0"
+            step="0.1"
+            value="1.0"
+          />
+          <div class="range-value" id="cardOpacityValue">100%</div>
+        </div>
+
+        <div class="control-group">
+          <label for="cardGloss">Gloss Level:</label>
+          <input
+            type="range"
+            id="cardGloss"
+            min="0.0"
+            max="1.0"
+            step="0.1"
+            value="0.6"
+          />
+          <div class="range-value" id="cardGlossValue">60%</div>
+        </div>
+
+        <div class="control-group">
+          <label for="cardColor">Color:</label>
+          <select id="cardColor">
+            <option value="0xff0000">Red</option>
+            <option value="0x00ff00">Green</option>
+            <option value="0x0000ff">Blue</option>
+            <option value="0xffff00">Yellow</option>
+            <option value="0xff00ff">Magenta</option>
+            <option value="0x00ffff">Cyan</option>
+            <option value="0xffffff">White</option>
+            <option value="0x000000">Black</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <button onclick="resetCamera()">Reset View</button>
+          <button onclick="toggleAnimation()">Toggle Rotation</button>
+          <button onclick="playCardAnimation()">Show Card</button>
+        </div>
+      </div>
+
+      <div class="status-display" id="statusDisplay">
+        <div class="status-title">Current Settings</div>
+        <div class="status-item">
+          <span class="status-label">Type:</span>
+          <span class="status-value" id="statusType">Simple</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Size:</span>
+          <span class="status-value" id="statusSize">20mm</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Thickness:</span>
+          <span class="status-value" id="statusThickness">0.5mm</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Opacity:</span>
+          <span class="status-value" id="statusOpacity">100%</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Gloss:</span>
+          <span class="status-value" id="statusGloss">60%</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Color:</span>
+          <span class="status-value" id="statusColor">Red</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Position:</span>
+          <span class="status-value" id="statusPosition">0, 0, -50</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Rotation:</span>
+          <span class="status-value" id="statusRotation">0°, 0°</span>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        createSimpleCard,
+        createGlossyCard,
+        createDebugCube,
+        setupSceneLighting,
+      } from "./card-model.js";
+
+      // Global variables
+      let scene, camera, renderer, currentCard;
+      let isAnimating = false;
+      let animationId;
+
+      // Mouse interaction variables
+      let isDragging = false;
+      let previousMousePosition = { x: 0, y: 0 };
+      let rotation = { x: 0, y: 0 };
+
+      // Card animation variables
+      let cardAnimation = {
+        isPlaying: false,
+        startTime: 0,
+        duration: 1500, // 1.5 seconds
+        startScale: 0.1,
+        startOpacity: 0.0,
+        startY: -0.08, // Start below the target position
+        targetScale: 1.0,
+        targetOpacity: 1.0,
+        targetY: -0.05, // Target position
+      };
+
+      // Initialize Three.js scene
+      function init() {
+        const canvas = document.getElementById("canvas");
+
+        // Create scene
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x222222);
+
+        // Create camera
+        camera = new THREE.PerspectiveCamera(
+          75,
+          window.innerWidth / window.innerHeight,
+          0.01,
+          1000
+        );
+        camera.position.set(0, 0, 0.1);
+
+        // Create renderer
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Set up lighting
+        setupSceneLighting(scene);
+
+        // Add environment map for better reflections
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        const envTexture = pmremGenerator.fromScene(new THREE.Scene()).texture;
+        scene.environment = envTexture;
+
+        // Create initial card
+        updateCard();
+
+        // Set up controls
+        setupControls();
+
+        // Handle window resize
+        window.addEventListener("resize", onWindowResize);
+
+        // Set up mouse controls
+        setupMouseControls();
+
+        // Start render loop
+        animate();
+      }
+
+      // Update card based on current settings
+      function updateCard() {
+        // Remove existing card
+        if (currentCard) {
+          scene.remove(currentCard);
+          currentCard.geometry?.dispose();
+          currentCard.material?.dispose();
+        }
+
+        // Get current settings
+        const cardType = document.getElementById("cardType").value;
+        const cardSize = parseFloat(document.getElementById("cardSize").value);
+        const cardThickness = parseFloat(
+          document.getElementById("cardThickness").value
+        );
+        const cardOpacity = parseFloat(
+          document.getElementById("cardOpacity").value
+        );
+        const cardGloss = parseFloat(
+          document.getElementById("cardGloss").value
+        );
+        const cardColor = parseInt(document.getElementById("cardColor").value);
+
+        // Create new card based on type
+        switch (cardType) {
+          case "simple":
+            currentCard = createSimpleCard(
+              cardSize,
+              cardSize * 1.4, // Make height 40% taller
+              cardColor,
+              cardThickness,
+              cardOpacity,
+              cardGloss
+            );
+            break;
+          case "glossy":
+            currentCard = createGlossyCard(
+              cardSize * 1.5,
+              cardSize * 2.0, // Increase height ratio from 1.8 to 2.0
+              cardThickness,
+              0.002, // corner radius
+              cardOpacity
+            );
+            break;
+          case "debug":
+            currentCard = createDebugCube(cardSize, cardColor);
+            break;
+        }
+
+        // Position card in front of camera
+        currentCard.position.set(0, 0, cardAnimation.targetY);
+
+        // Apply current rotation
+        currentCard.rotation.x = rotation.x;
+        currentCard.rotation.y = rotation.y;
+
+        // Set initial state for animation
+        if (!cardAnimation.isPlaying) {
+          currentCard.scale.set(
+            cardAnimation.targetScale,
+            cardAnimation.targetScale,
+            cardAnimation.targetScale
+          );
+          currentCard.material.opacity = cardOpacity;
+          currentCard.position.z = cardAnimation.targetY;
+        }
+
+        scene.add(currentCard);
+
+        // Update status display
+        updateStatusDisplay();
+      }
+
+      // Update status display with current values
+      function updateStatusDisplay() {
+        if (!currentCard) return;
+
+        // Get current settings
+        const cardType = document.getElementById("cardType").value;
+        const cardSize = parseFloat(document.getElementById("cardSize").value);
+        const cardThickness = parseFloat(
+          document.getElementById("cardThickness").value
+        );
+        const cardOpacity = parseFloat(
+          document.getElementById("cardOpacity").value
+        );
+        const cardGloss = parseFloat(
+          document.getElementById("cardGloss").value
+        );
+        const cardColor = document.getElementById("cardColor").value;
+
+        // Get color name from hex value
+        const colorNames = {
+          "0xff0000": "Red",
+          "0x00ff00": "Green",
+          "0x0000ff": "Blue",
+          "0xffff00": "Yellow",
+          "0xff00ff": "Magenta",
+          "0x00ffff": "Cyan",
+          "0xffffff": "White",
+          "0x000000": "Black",
+        };
+
+        // Get type name
+        const typeNames = {
+          simple: "Simple",
+          glossy: "Glossy",
+          debug: "Debug",
+        };
+
+        // Update display elements
+        document.getElementById("statusType").textContent =
+          typeNames[cardType] || "Unknown";
+        document.getElementById("statusSize").textContent = `${(
+          cardSize * 1000
+        ).toFixed(0)}mm`;
+        document.getElementById("statusThickness").textContent = `${(
+          cardThickness * 1000
+        ).toFixed(1)}mm`;
+        document.getElementById("statusOpacity").textContent = `${(
+          cardOpacity * 100
+        ).toFixed(0)}%`;
+        document.getElementById("statusGloss").textContent = `${(
+          cardGloss * 100
+        ).toFixed(0)}%`;
+        document.getElementById("statusColor").textContent =
+          colorNames[cardColor] || "Unknown";
+
+        // Update position (in mm for readability)
+        const pos = currentCard.position;
+        document.getElementById("statusPosition").textContent = `${(
+          pos.x * 1000
+        ).toFixed(0)}, ${(pos.y * 1000).toFixed(0)}, ${(pos.z * 1000).toFixed(
+          0
+        )}`;
+
+        // Update rotation (in degrees)
+        document.getElementById("statusRotation").textContent = `${(
+          (rotation.x * 180) /
+          Math.PI
+        ).toFixed(0)}°, ${((rotation.y * 180) / Math.PI).toFixed(0)}°`;
+      }
+
+      // Set up control event listeners
+      function setupControls() {
+        const cardType = document.getElementById("cardType");
+        const cardSize = document.getElementById("cardSize");
+        const cardThickness = document.getElementById("cardThickness");
+        const cardOpacity = document.getElementById("cardOpacity");
+        const cardGloss = document.getElementById("cardGloss");
+        const cardColor = document.getElementById("cardColor");
+        const cardSizeValue = document.getElementById("cardSizeValue");
+        const cardThicknessValue =
+          document.getElementById("cardThicknessValue");
+        const cardOpacityValue = document.getElementById("cardOpacityValue");
+        const cardGlossValue = document.getElementById("cardGlossValue");
+
+        cardType.addEventListener("change", updateCard);
+        cardColor.addEventListener("change", updateCard);
+
+        cardSize.addEventListener("input", () => {
+          const size = parseFloat(cardSize.value);
+          cardSizeValue.textContent = `${(size * 1000).toFixed(0)}mm`;
+          updateCard();
+        });
+
+        cardThickness.addEventListener("input", () => {
+          const thickness = parseFloat(cardThickness.value);
+          cardThicknessValue.textContent = `${(thickness * 1000).toFixed(1)}mm`;
+          updateCard();
+        });
+
+        cardOpacity.addEventListener("input", () => {
+          const opacity = parseFloat(cardOpacity.value);
+          cardOpacityValue.textContent = `${(opacity * 100).toFixed(0)}%`;
+          updateCard();
+        });
+
+        cardGloss.addEventListener("input", () => {
+          const gloss = parseFloat(cardGloss.value);
+          cardGlossValue.textContent = `${(gloss * 100).toFixed(0)}%`;
+          updateCard();
+        });
+
+        // Initialize displays
+        cardSizeValue.textContent = `${(
+          parseFloat(cardSize.value) * 1000
+        ).toFixed(0)}mm`;
+        cardThicknessValue.textContent = `${(
+          parseFloat(cardThickness.value) * 1000
+        ).toFixed(1)}mm`;
+        cardOpacityValue.textContent = `${(
+          parseFloat(cardOpacity.value) * 100
+        ).toFixed(0)}%`;
+        cardGlossValue.textContent = `${(
+          parseFloat(cardGloss.value) * 100
+        ).toFixed(0)}%`;
+      }
+
+      // Set up mouse controls for rotation
+      function setupMouseControls() {
+        const canvas = document.getElementById("canvas");
+
+        // Mouse down
+        canvas.addEventListener("mousedown", (event) => {
+          isDragging = true;
+          previousMousePosition = {
+            x: event.clientX,
+            y: event.clientY,
+          };
+          canvas.style.cursor = "grabbing";
+        });
+
+        // Mouse move
+        canvas.addEventListener("mousemove", (event) => {
+          if (isDragging && currentCard) {
+            const deltaX = event.clientX - previousMousePosition.x;
+            const deltaY = event.clientY - previousMousePosition.y;
+
+            // Update rotation based on mouse movement
+            rotation.y += deltaX * 0.01; // Horizontal rotation
+            rotation.x += deltaY * 0.01; // Vertical rotation
+
+            // Limit vertical rotation to prevent flipping
+            rotation.x = Math.max(
+              -Math.PI / 2,
+              Math.min(Math.PI / 2, rotation.x)
+            );
+
+            // Apply rotation to current card
+            if (!isAnimating) {
+              currentCard.rotation.x = rotation.x;
+              currentCard.rotation.y = rotation.y;
+            }
+
+            // Update status display during mouse interaction
+            updateStatusDisplay();
+
+            previousMousePosition = {
+              x: event.clientX,
+              y: event.clientY,
+            };
+          }
+        });
+
+        // Mouse up
+        canvas.addEventListener("mouseup", () => {
+          isDragging = false;
+          canvas.style.cursor = "grab";
+        });
+
+        // Mouse leave
+        canvas.addEventListener("mouseleave", () => {
+          isDragging = false;
+          canvas.style.cursor = "grab";
+        });
+
+        // Touch events for mobile
+        canvas.addEventListener("touchstart", (event) => {
+          event.preventDefault();
+          const touch = event.touches[0];
+          isDragging = true;
+          previousMousePosition = {
+            x: touch.clientX,
+            y: touch.clientY,
+          };
+        });
+
+        canvas.addEventListener("touchmove", (event) => {
+          event.preventDefault();
+          if (isDragging && currentCard) {
+            const touch = event.touches[0];
+            const deltaX = touch.clientX - previousMousePosition.x;
+            const deltaY = touch.clientY - previousMousePosition.y;
+
+            rotation.y += deltaX * 0.01;
+            rotation.x += deltaY * 0.01;
+            rotation.x = Math.max(
+              -Math.PI / 2,
+              Math.min(Math.PI / 2, rotation.x)
+            );
+
+            if (!isAnimating) {
+              currentCard.rotation.x = rotation.x;
+              currentCard.rotation.y = rotation.y;
+            }
+
+            // Update status display during touch interaction
+            updateStatusDisplay();
+
+            previousMousePosition = {
+              x: touch.clientX,
+              y: touch.clientY,
+            };
+          }
+        });
+
+        canvas.addEventListener("touchend", (event) => {
+          event.preventDefault();
+          isDragging = false;
+        });
+
+        // Set initial cursor
+        canvas.style.cursor = "grab";
+      }
+
+      // Animation loop
+      function animate() {
+        animationId = requestAnimationFrame(animate);
+
+        // Handle card appearance animation
+        if (cardAnimation.isPlaying && currentCard) {
+          const elapsed = Date.now() - cardAnimation.startTime;
+          const progress = Math.min(elapsed / cardAnimation.duration, 1.0);
+
+          // Easing function (ease-out)
+          const easeOut = 1 - Math.pow(1 - progress, 3);
+
+          // Animate scale
+          const currentScale =
+            cardAnimation.startScale +
+            (cardAnimation.targetScale - cardAnimation.startScale) * easeOut;
+          currentCard.scale.set(currentScale, currentScale, currentScale);
+
+          // Animate opacity
+          const currentOpacity =
+            cardAnimation.startOpacity +
+            (cardAnimation.targetOpacity - cardAnimation.startOpacity) *
+              easeOut;
+          currentCard.material.opacity = currentOpacity;
+          currentCard.material.transparent = true;
+
+          // Animate Y position (bottom to top movement)
+          const currentY =
+            cardAnimation.startY +
+            (cardAnimation.targetY - cardAnimation.startY) * easeOut;
+          currentCard.position.z = currentY;
+
+          // Animation complete
+          if (progress >= 1.0) {
+            cardAnimation.isPlaying = false;
+            currentCard.material.transparent = currentOpacity < 1.0;
+            currentCard.position.z = cardAnimation.targetY;
+          }
+        }
+
+        // Rotate card if rotation animation is enabled
+        if (isAnimating && currentCard && !cardAnimation.isPlaying) {
+          currentCard.rotation.y += 0.01;
+          currentCard.rotation.x += 0.005;
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      // Reset camera position and rotation
+      window.resetCamera = function () {
+        camera.position.set(0, 0, 0.1);
+        camera.lookAt(0, 0, 0);
+
+        // Reset card rotation
+        rotation = { x: 0, y: 0 };
+        if (currentCard) {
+          currentCard.rotation.x = 0;
+          currentCard.rotation.y = 0;
+        }
+      };
+
+      // Toggle rotation animation
+      window.toggleAnimation = function () {
+        isAnimating = !isAnimating;
+      };
+
+      // Play card appearance animation
+      window.playCardAnimation = function () {
+        if (!currentCard || cardAnimation.isPlaying) return;
+
+        // Set initial animation state
+        cardAnimation.isPlaying = true;
+        cardAnimation.startTime = Date.now();
+
+        // Get target opacity from current settings
+        const cardOpacity = parseFloat(
+          document.getElementById("cardOpacity").value
+        );
+        cardAnimation.targetOpacity = cardOpacity;
+
+        // Start with small scale, no opacity, and bottom position
+        currentCard.scale.set(
+          cardAnimation.startScale,
+          cardAnimation.startScale,
+          cardAnimation.startScale
+        );
+        currentCard.material.opacity = cardAnimation.startOpacity;
+        currentCard.material.transparent = true;
+        currentCard.position.z = cardAnimation.startY; // Start from bottom
+      };
+
+      // Handle window resize
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      // Start the application
+      init();
+    </script>
+  </body>
+</html>
