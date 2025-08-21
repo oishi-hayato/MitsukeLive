@@ -6,6 +6,7 @@ export {
   type VisualEffectOptions,
 } from "./lib/visual-effects";
 export { type ThreeDEstimationOptions } from "./types";
+export type { DetectionController } from "./lib/detection-controller";
 
 import { DetectionController } from "./lib/detection-controller";
 import type { ObjectDetectorOptions } from "./types";
