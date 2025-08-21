@@ -17,6 +17,11 @@
 
     <script type="module">
       import * as MitsukeLive from "../dist/index.js";
+      import {
+        createSimpleCard,
+        createGlossyCard,
+        setupSceneLighting,
+      } from "./card-model.js";
 
       const { createApp, ref, onMounted, onUnmounted } = Vue;
 
@@ -56,12 +61,25 @@
             isDetecting: ref(false),
           };
 
-          let detector = null;
+          // Three.js variables
           let scene = null;
           let camera = null;
           let renderer = null;
-          let cubes = []; // Manage multiple objects
+          let cards = [];
           let animationId = null;
+
+          // Animation and interpolation variables
+          let lastTime = 0;
+          const targetFPS = 30;
+          const frameInterval = 1000 / targetFPS;
+          let targetPosition = new THREE.Vector3(0, 0, 0);
+          let targetRotation = new THREE.Euler(0, 0, 0);
+          let targetScale = new THREE.Vector3(1, 1, 1);
+
+          // Detection variables
+          let detector = null;
+          let lastDetectionTime = 0;
+          let hideTimeout = null;
 
           // Initialize Three.js scene
           const initThreeJS = () => {
@@ -94,84 +112,55 @@
             );
             camera.position.z = 0;
 
-            // Create multiple cubes (positioned around central object)
-            const cubeConfigs = [
-              {
-                color: 0x00ff88,
-                offsetX: 0,
-                offsetY: 0,
-                offsetZ: 0,
-                name: "center",
-              }, // center
-              {
-                color: 0xff0088,
-                offsetX: 0.02,
-                offsetY: 0,
-                offsetZ: 0,
-                name: "right",
-              }, // right
-              {
-                color: 0x0088ff,
-                offsetX: -0.02,
-                offsetY: 0,
-                offsetZ: 0,
-                name: "left",
-              }, // left
-              {
-                color: 0xffff00,
-                offsetX: 0,
-                offsetY: 0.02,
-                offsetZ: 0,
-                name: "top",
-              }, // top
-              {
-                color: 0xff8800,
-                offsetX: 0,
-                offsetY: -0.02,
-                offsetZ: 0,
-                name: "bottom",
-              }, // bottom
-            ];
+            // Create single transparent glass card
+            const card = createGlossyCard(0.03, 0.035, 0.0004, 0.002, 0.5, 1.0);
+            card.visible = false;
+            card.userData = { name: "card", index: 0 };
+            cards.push(card);
+            scene.add(card);
 
-            cubeConfigs.forEach((config, index) => {
-              const geometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
-              const material = new THREE.MeshBasicMaterial({
-                color: config.color,
-                wireframe: true,
-                wireframeLinewidth: 5,
-              });
-              const cube = new THREE.Mesh(geometry, material);
-              cube.visible = false;
-              cube.userData = { ...config, index };
-              cubes.push(cube);
-              scene.add(cube);
-            });
-
-            // Add light
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
+            // Set up optimized lighting for card materials
+            setupSceneLighting(scene);
           };
 
-          // Three.js animation loop
-          const animate = () => {
+          // Use Three.js built-in linear interpolation
+          const lerp = THREE.MathUtils.lerp;
+
+          // Three.js animation loop (30 FPS with smooth interpolation)
+          const animate = (currentTime) => {
             animationId = requestAnimationFrame(animate);
 
-            // Rotate visible cubes
-            cubes.forEach((cube) => {
-              if (cube.visible) {
-                cube.rotation.x += 0.01;
-                cube.rotation.y += 0.01;
-              }
-            });
+            if (currentTime - lastTime >= frameInterval) {
+              // Smooth interpolation for card movement
+              const card = cards[0];
+              if (card && card.visible) {
+                const lerpFactor = 0.15; // Smooth factor
 
-            if (renderer && scene && camera) {
-              renderer.render(scene, camera);
+                // Smooth interpolation using Three.js Vector methods
+                card.position.lerp(targetPosition, lerpFactor);
+                card.rotation.x = lerp(
+                  card.rotation.x,
+                  targetRotation.x,
+                  lerpFactor
+                );
+                card.rotation.z = lerp(
+                  card.rotation.z,
+                  targetRotation.z,
+                  lerpFactor
+                );
+                card.scale.lerp(targetScale, lerpFactor);
+              }
+
+              if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+              }
+              lastTime = currentTime;
             }
           };
 
-          // Update 3D object position
+          // Update 3D card position with smooth interpolation
           const update3DObject = (detection) => {
-            if (cubes.length === 0 || !camera || !renderer) return;
+            if (cards.length === 0 || !camera || !renderer) return;
 
             const [x, y, width, height] = detection.boundingBox;
             const detectionCanvas = document.getElementById("canvas");
@@ -183,9 +172,8 @@
             const centerY = y + height / 2;
 
             // Convert to Three.js world coordinates
-            // Coordinate transformation considering camera FOV and aspect ratio
             const aspect = canvasWidth / canvasHeight;
-            const fov = (camera.fov * Math.PI) / 180; // Convert to radians
+            const fov = (camera.fov * Math.PI) / 180;
             const depth = detection.depth;
 
             // Calculate view width and height from FOV
@@ -194,53 +182,38 @@
 
             // Convert to normalized coordinates (-1 to 1)
             const normalizedX = (centerX / canvasWidth) * 2 - 1;
-            const normalizedY = -((centerY / canvasHeight) * 2 - 1); // Flip Y axis
+            const normalizedY = -((centerY / canvasHeight) * 2 - 1);
 
             // Convert to world coordinates
             const worldX = normalizedX * (viewWidth / 2);
             const worldY = normalizedY * (viewHeight / 2);
-            const worldZ = -depth; // Direction away from camera
+            const worldZ = -depth;
 
-            // Set relative position for each cube
-            cubes.forEach((cube, index) => {
-              const config = cube.userData;
+            // Update target values for smooth interpolation
+            const card = cards[0];
+            if (card) {
+              // Update target values using Three.js methods
+              targetPosition.set(worldX, worldY, worldZ);
+              targetRotation.set(
+                (detection.orientation.pitch * Math.PI) / 180,
+                0,
+                (detection.orientation.roll * Math.PI) / 180
+              );
 
-              // Add offset to base position
-              const posX = worldX + config.offsetX;
-              const posY = worldY + config.offsetY;
-              const posZ = worldZ + config.offsetZ;
+              const baseScale = 0.3;
+              const scale = baseScale / Math.max(depth, 0.1);
+              targetScale.set(scale, scale, scale);
 
-              cube.position.set(posX, posY, posZ);
-
-              // Scale calculation (based on depth - closer objects appear larger)
-              const baseScale = index === 0 ? 0.15 : 0.1; // Center cube slightly larger
-              const scale = baseScale / Math.max(depth, 0.1); // Closer objects larger, prevent division by zero
-              cube.scale.set(scale, scale, scale);
-
-              // Smooth display animation
-              if (!cube.visible) {
-                cube.visible = true;
-                // Animation starting small and expanding (with time delay)
-                setTimeout(() => {
-                  cube.scale.set(scale * 0.1, scale * 0.1, scale * 0.1);
-                  const targetScale = scale;
-                  const animateScale = () => {
-                    const currentScale = cube.scale.x;
-                    if (currentScale < targetScale * 0.95) {
-                      const newScale = currentScale * 1.1;
-                      cube.scale.set(newScale, newScale, newScale);
-                      requestAnimationFrame(animateScale);
-                    } else {
-                      cube.scale.set(targetScale, targetScale, targetScale);
-                    }
-                  };
-                  animateScale();
-                }, index * 100); // Sequential display at 100ms intervals
-              } else {
-                // Simply set scale if already displayed
-                cube.scale.set(scale, scale, scale);
+              // Show card if not visible
+              if (!card.visible) {
+                card.visible = true;
+                // Set initial position immediately for first display
+                card.position.set(worldX, worldY, worldZ);
+                card.rotation.x = targetRotation.x;
+                card.rotation.z = targetRotation.z;
+                card.scale.set(scale * 0.1, scale * 0.1, scale * 0.1);
               }
-            });
+            }
           };
 
           // Format detection information
@@ -252,18 +225,32 @@
             box: detection.boundingBox.map((v) => Math.round(v)),
           });
 
-          // Handle detection
+          // Handle detection with 500ms timeout
           const handleDetection = (detection) => {
             if (!state.isDetecting.value) return;
 
             if (detection) {
               state.detectionInfo.value = formatDetectionInfo(detection);
               update3DObject(detection);
+              lastDetectionTime = Date.now();
+
+              // Clear any existing hide timeout
+              if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+              }
             } else {
               state.detectionInfo.value = null;
-              cubes.forEach((cube) => {
-                cube.visible = false;
-              });
+
+              // Set timeout to hide card after 500ms
+              if (!hideTimeout) {
+                hideTimeout = setTimeout(() => {
+                  cards.forEach((card) => {
+                    card.visible = false;
+                  });
+                  hideTimeout = null;
+                }, 500);
+              }
             }
           };
 
@@ -310,8 +297,8 @@
               state.isDetecting.value = false;
               state.status.value = MESSAGES.PAUSED;
               state.detectionInfo.value = null;
-              cubes.forEach((cube) => {
-                cube.visible = false;
+              cards.forEach((card) => {
+                card.visible = false;
               });
             } else {
               detector.resume();
