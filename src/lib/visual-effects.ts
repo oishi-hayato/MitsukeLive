@@ -27,7 +27,7 @@ export interface VisualEffectOptions {
 export function startFlashEffect(
   canvas: HTMLCanvasElement,
   detection: Detection | ARDetection,
-  options: VisualEffectOptions = {}
+  options: VisualEffectOptions = {},
 ): Promise<void> {
   const {
     interval = 500,
@@ -44,7 +44,6 @@ export function startFlashEffect(
     }
 
     let isVisible = true;
-    let flashInterval: number;
     let stopTimeout: number;
     let completedFlashes = 0;
 
@@ -85,7 +84,7 @@ export function startFlashEffect(
     };
 
     // Flash animation
-    flashInterval = window.setInterval(() => {
+    const flashInterval = window.setInterval(() => {
       drawBox(); // Draw with current isVisible state
       isVisible = !isVisible; // Switch to next state
 

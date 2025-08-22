@@ -17,7 +17,7 @@ export class CameraManager {
    */
   static async setup(
     videoElementId: string,
-    onCameraReady: () => void
+    onCameraReady: () => void,
   ): Promise<CameraManager> {
     const element = document.getElementById(videoElementId);
 

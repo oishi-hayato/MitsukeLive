@@ -11,8 +11,11 @@ import { convertDegreesToRadians } from "./math-helper";
  * @returns 2D center coordinates {x, y}
  */
 export function calculate2DCenter(
-  boundingBox: [number, number, number, number]
-): { x: number; y: number } {
+  boundingBox: [number, number, number, number],
+): {
+  x: number;
+  y: number;
+} {
   const [x, y, width, height] = boundingBox;
 
   return {
@@ -37,7 +40,7 @@ export function convertToThreeJSSpaceCoordinates(
   canvasWidth: number,
   canvasHeight: number,
   depth: number,
-  cameraFov: number
+  cameraFov: number,
 ): { x: number; y: number; z: number } {
   // Convert FOV to radians and calculate aspect ratio
   const aspect = canvasWidth / canvasHeight;

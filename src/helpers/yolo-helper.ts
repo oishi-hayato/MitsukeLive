@@ -24,7 +24,7 @@ export function calculateOptimalScale(
   originalWidth: number,
   originalHeight: number,
   targetWidth: number = 640,
-  targetHeight: number = 640
+  targetHeight: number = 640,
 ): { scaleRatio: number; scaledWidth: number; scaledHeight: number } {
   if (originalWidth <= 0 || originalHeight <= 0) {
     throw new MLInternalError("INVALID_IMAGE_DIMENSIONS");
@@ -32,7 +32,7 @@ export function calculateOptimalScale(
 
   const scaleRatio = Math.min(
     targetWidth / originalWidth,
-    targetHeight / originalHeight
+    targetHeight / originalHeight,
   );
   const scaledWidth = Math.round(originalWidth * scaleRatio);
   const scaledHeight = Math.round(originalHeight * scaleRatio);
@@ -54,7 +54,7 @@ export function calculatePadding(
   scaledWidth: number,
   scaledHeight: number,
   letterboxWidth: number = 640,
-  letterboxHeight: number = 640
+  letterboxHeight: number = 640,
 ): {
   top: number;
   left: number;
@@ -89,7 +89,7 @@ export function calculatePadding(
  */
 export function letterboxTransform(
   image: tf.Tensor3D,
-  letterboxShape: [number, number] = [640, 640]
+  letterboxShape: [number, number] = [640, 640],
 ): { output: tf.Tensor3D; letterboxInfo: LetterboxInfo } {
   // Input validation: Check if 3D tensor
   if (image.shape.length !== 3) {
@@ -109,7 +109,7 @@ export function letterboxTransform(
     originalWidth,
     originalHeight,
     letterboxWidth,
-    letterboxHeight
+    letterboxHeight,
   );
 
   // Resized tensor (intermediate object)
@@ -121,7 +121,7 @@ export function letterboxTransform(
       scaledWidth,
       scaledHeight,
       letterboxWidth,
-      letterboxHeight
+      letterboxHeight,
     );
 
     // Image with padding added by letterbox processing
@@ -162,7 +162,7 @@ export function letterboxToOriginal(
   height: number,
   scale: number,
   top: number,
-  left: number
+  left: number,
 ): Rect {
   // Input validation: Check if finite numbers
   if (
@@ -206,7 +206,7 @@ export function letterboxToOriginal(
 export function originalToCanvas(
   rect: Rect,
   canvasElement: HTMLCanvasElement,
-  croppedSize: { width: number; height: number }
+  croppedSize: { width: number; height: number },
 ): Rect {
   // Input validation: Check if finite numbers
   if (
@@ -262,7 +262,7 @@ export function originalToCanvas(
 export function transformToCanvas(
   predictions: Detection[],
   letterboxInfo: LetterboxInfo,
-  canvasElement: HTMLCanvasElement
+  canvasElement: HTMLCanvasElement,
 ): Detection[] {
   // Input validation
   if (!predictions || predictions.length === 0) {
@@ -321,7 +321,7 @@ export function transformToCanvas(
         height,
         scale,
         top,
-        left
+        left,
       );
 
       // Convert from original image coordinates to canvas coordinates
@@ -365,7 +365,7 @@ export function transformToCanvas(
 export function findValidDetections(
   data: number[][],
   numDetections: number,
-  scoreThreshold: number
+  scoreThreshold: number,
 ): Detection[] {
   // Input validation
   if (
@@ -386,7 +386,7 @@ export function findValidDetections(
     data[1]?.length || 0,
     data[2]?.length || 0,
     data[3]?.length || 0,
-    data[4]?.length || 0
+    data[4]?.length || 0,
   );
 
   if (minRequiredLength === 0) {

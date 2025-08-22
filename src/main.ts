@@ -5,7 +5,7 @@ export {
   startFlashEffect,
   type VisualEffectOptions,
 } from "./lib/visual-effects";
-export { type ThreeDEstimationOptions } from "./types";
+export type { ThreeDEstimationOptions } from "./types";
 export type { DetectionController } from "./lib/detection-controller";
 
 import { DetectionController } from "./lib/detection-controller";
@@ -20,12 +20,12 @@ export async function createDetector(
   canvasElementId: string,
   modelPath: string,
   metadataPath: string,
-  options: ObjectDetectorOptions = {}
+  options: ObjectDetectorOptions = {},
 ): Promise<DetectionController> {
   const detectionController = new DetectionController(
     modelPath,
     metadataPath,
-    options
+    options,
   );
 
   try {
