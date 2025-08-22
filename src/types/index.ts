@@ -57,7 +57,11 @@ export interface ObjectDetectorOptions {
     memoryThreshold?: number;
   };
 
-  /** Callback function called during object detection (null if no detection, ARDetection when 3D estimation is enabled) */
+  /** 
+   * Callback function called during object detection
+   * @param detection Detection result (null if no detection, ARDetection when 3D estimation is enabled)
+   * Note: This callback is not called when detection is paused with pause({ pauseCamera: false })
+   */
   onDetection?: (detection: Detection | ARDetection | null) => void;
   /** Callback function called when camera initialization is complete */
   onCameraReady?: () => void;

@@ -33,6 +33,7 @@ enum DetectionState {
   IDLE = "idle", // Idle state (detection ready)
   PROCESSING = "processing", // Detection processing in progress
   PAUSED = "paused", // Paused
+  DETECTION_PAUSED = "detection_paused", // Detection paused (camera continues)
 }
 
 export class DetectionController {
@@ -289,10 +290,17 @@ export class DetectionController {
   /**
    * Pause detection processing
    * Detection loop continues but skips actual inference processing
+   * @param options Pause options. If pauseCamera is false, only pauses detection (camera continues).
    */
-  public pause(): void {
-    this.detectionState = DetectionState.PAUSED;
-    this.video.pause();
+  public pause(
+    options: { pauseCamera?: boolean } = { pauseCamera: true }
+  ): void {
+    if (options.pauseCamera) {
+      this.detectionState = DetectionState.PAUSED;
+      this.video.pause();
+    } else {
+      this.detectionState = DetectionState.DETECTION_PAUSED;
+    }
   }
 
   /**

@@ -4,14 +4,14 @@
 
 # MitsukeLive
 
-MitsukeLive is a real-time object detection library using TensorFlow.js and YOLO models.
+MitsukeLive is a browser-based real-time object detection library using TensorFlow.js and YOLO models, with flexible post-detection customization.
 
 MitsukeLive provides two detection modes:
 
-| Mode      | Features                                                                                       |
-| --------- | ---------------------------------------------------------------------------------------------- |
-| **2D**    | Basic object detection with 2D center coordinates<br>Manual pause/resume control                |
-| **3D/AR** | Advanced object detection with 3D position and orientation<br>Continuous detection for AR experiences |
+| Mode      | Features                                                                                        |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| **2D**    | Basic object detection with 2D center coordinates                                               |
+| **3D/AR** | Object detection with 3D position and orientation, integrated with Three.js for AR applications |
 
 ## Example
 
@@ -30,38 +30,61 @@ Access http://localhost:3000 in your browser to view two demos:
 
 ### ObjectDetectorOptions
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `detection.inferenceInterval` | `number` | `500` | Inference execution interval (milliseconds) |
-| `detection.scoreThreshold` | `number` | `0.7` | Minimum confidence score for detection (0.0-1.0) |
-| `threeDEstimation.objectSize.width` | `number` | - | Real object width in meters (required for 3D mode) |
-| `threeDEstimation.objectSize.height` | `number` | - | Real object height in meters (required for 3D mode) |
-| `threeDEstimation.cameraFov` | `number` | `50` | Camera field of view in degrees |
-| `performance.backend` | `string` | `"webgl"` | TensorFlow.js backend (`"webgl"`, `"webgpu"`, `"wasm"`, `"cpu"`) |
-| `performance.memoryThreshold` | `number` | `50` | Tensor count threshold for memory cleanup |
-| `onDetection` | `function` | - | Callback for detection results |
-| `onCameraReady` | `function` | - | Callback when camera is ready |
-| `onCameraNotAllowed` | `function` | - | Callback when camera access is denied |
+| Parameter                            | Type       | Default   | Description                                                          |
+| ------------------------------------ | ---------- | --------- | -------------------------------------------------------------------- |
+| `detection.inferenceInterval`        | `number`   | `500`     | Inference execution interval (milliseconds)                          |
+| `detection.scoreThreshold`           | `number`   | `0.7`     | Minimum confidence score for detection (0.0-1.0)                     |
+| `threeDEstimation.objectSize.width`  | `number`   | -         | Real object width in meters (required for 3D mode)                   |
+| `threeDEstimation.objectSize.height` | `number`   | -         | Real object height in meters (required for 3D mode)                  |
+| `threeDEstimation.cameraFov`         | `number`   | `50`      | Camera field of view in degrees                                      |
+| `performance.backend`                | `string`   | `"webgl"` | TensorFlow.js backend (`"webgl"`, `"webgpu"`, `"wasm"`, `"cpu"`)     |
+| `performance.memoryThreshold`        | `number`   | `50`      | Tensor count threshold for memory cleanup                            |
+| `onDetection`                        | `function` | -         | Callback for detection results (not called when detection is paused) |
+| `onCameraReady`                      | `function` | -         | Callback when camera is ready                                        |
+| `onCameraNotAllowed`                 | `function` | -         | Callback when camera access is denied                                |
 
 ### Detection Result Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property      | Type                               | Description                                      |
+| ------------- | ---------------------------------- | ------------------------------------------------ |
 | `boundingBox` | `[number, number, number, number]` | Object position and size `[x, y, width, height]` |
-| `center2D` | `{x: number, y: number}` | Center coordinates in canvas pixels |
-| `angle` | `number` | Rotation angle in degrees |
-| `score` | `number` | Confidence score (0.0-1.0) |
+| `center2D`    | `{x: number, y: number}`           | Center coordinates in canvas pixels              |
+| `angle`       | `number`                           | Rotation angle in degrees                        |
+| `score`       | `number`                           | Confidence score (0.0-1.0)                       |
 
 ### ARDetection Additional Properties (3D Mode)
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `depth` | `number` | Distance from camera in meters |
-| `orientation.pitch` | `number` | Up-down tilt angle (-90 to 90 degrees) |
-| `orientation.roll` | `number` | Left-right tilt angle (-180 to 180 degrees) |
-| `position3D.x` | `number` | 3D space X coordinate for Three.js |
-| `position3D.y` | `number` | 3D space Y coordinate for Three.js |
-| `position3D.z` | `number` | 3D space Z coordinate for Three.js |
+| Property            | Type     | Description                                 |
+| ------------------- | -------- | ------------------------------------------- |
+| `depth`             | `number` | Distance from camera in meters              |
+| `orientation.pitch` | `number` | Up-down tilt angle (-90 to 90 degrees)      |
+| `orientation.roll`  | `number` | Left-right tilt angle (-180 to 180 degrees) |
+| `position3D.x`      | `number` | 3D space X coordinate for Three.js          |
+| `position3D.y`      | `number` | 3D space Y coordinate for Three.js          |
+| `position3D.z`      | `number` | 3D space Z coordinate for Three.js          |
+
+## DetectionController Methods
+
+### pause(options?)
+
+Pause detection processing.
+
+```typescript
+// Pause both camera and detection (default behavior)
+detector.pause();
+detector.pause({ pauseCamera: true });
+
+// Pause only detection, keep camera running
+detector.pause({ pauseCamera: false });
+```
+
+### resume()
+
+Resume detection processing.
+
+```typescript
+detector.resume();
+```
 
 ## Partners
 

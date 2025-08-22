@@ -336,7 +336,7 @@ export function transformToCanvas(
         canvasRect.width,
         canvasRect.height,
       ];
-      
+
       const center2D = calculate2DCenter(canvasBBox);
 
       validTransformedPredictions.push({
@@ -432,7 +432,7 @@ export function findValidDetections(
 
     const detectionBBox: BoundingBox = [x, y, width, height];
     const center2D = calculate2DCenter(detectionBBox);
-    
+
     validDetections.push({
       boundingBox: detectionBBox,
       angle,
