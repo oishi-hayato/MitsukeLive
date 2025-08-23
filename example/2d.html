@@ -61,12 +61,6 @@
               box: detection.boundingBox?.map((v) => Math.round(v)) || [
                 0, 0, 0, 0,
               ],
-              centerX: detection.center2D?.x
-                ? Math.round(detection.center2D.x)
-                : 0,
-              centerY: detection.center2D?.y
-                ? Math.round(detection.center2D.y)
-                : 0,
             };
           };
 
@@ -187,10 +181,6 @@
                 <div class="info__item">
                   <span class="info__label">BBox:</span>
                   <span class="info__value monospace">[{{ detectionInfo.box.join(', ') }}]</span>
-                </div>
-                <div class="info__item">
-                  <span class="info__label">Center:</span>
-                  <span class="info__value monospace">({{ detectionInfo.centerX }}, {{ detectionInfo.centerY }})</span>
                 </div>
               </div>
             </div>

@@ -191,8 +191,8 @@ export function add3DToDetection(
   let position3D = undefined;
   if (canvasWidth && canvasHeight && cameraFov) {
     position3D = convertToThreeJSSpaceCoordinates(
-      detection.center2D.x,
-      detection.center2D.y,
+      detection.boundingBox[0], // centerX
+      detection.boundingBox[1], // centerY
       canvasWidth,
       canvasHeight,
       info.depth,

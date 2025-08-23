@@ -2,7 +2,6 @@ import type * as tf from "@tensorflow/tfjs";
 import type { LetterboxInfo, Detection } from "../types";
 import { MLInternalError } from "../errors";
 import { convertRadiansToDegrees } from "./math-helper";
-import { calculate2DCenter } from "./position-helper";
 
 // Type aliases
 type BoundingBox = [number, number, number, number];
@@ -337,13 +336,10 @@ export function transformToCanvas(
         canvasRect.height,
       ];
 
-      const center2D = calculate2DCenter(canvasBBox);
-
       validTransformedPredictions.push({
         boundingBox: canvasBBox,
         angle: convertRadiansToDegrees(angle),
         score,
-        center2D,
       });
     } catch (error) {
       // Skip and continue on coordinate transformation error
@@ -357,7 +353,7 @@ export function transformToCanvas(
 /**
  * Get detection results above threshold (sorted by score descending)
  *
- * @param data - 2D array of model output data [x[], y[], width[], height[], score[], angle?[]]
+ * @param data - 2D array of model output data [centerX[], centerY[], width[], height[], score[], angle?[]]
  * @param numDetections - Number of detections (>= 0)
  * @param scoreThreshold - Score threshold (0.0-1.0)
  * @returns Array of detection results above score threshold (sorted by score descending)
@@ -406,15 +402,15 @@ export function findValidDetections(
       continue;
     }
 
-    // Validate bounding box
-    const x = data[0][i];
-    const y = data[1][i];
+    // Validate bounding box - YOLO outputs center coordinates
+    const centerX = data[0][i];
+    const centerY = data[1][i];
     const width = data[2][i];
     const height = data[3][i];
 
     if (
-      !Number.isFinite(x) ||
-      !Number.isFinite(y) ||
+      !Number.isFinite(centerX) ||
+      !Number.isFinite(centerY) ||
       !Number.isFinite(width) ||
       !Number.isFinite(height) ||
       width < 0 ||
@@ -430,14 +426,11 @@ export function findValidDetections(
       angle = Number.isFinite(angleValue) ? angleValue : 0;
     }
 
-    const detectionBBox: BoundingBox = [x, y, width, height];
-    const center2D = calculate2DCenter(detectionBBox);
-
+    const detectionBBox: BoundingBox = [centerX, centerY, width, height];
     validDetections.push({
       boundingBox: detectionBBox,
       angle,
       score,
-      center2D,
     });
   }
 

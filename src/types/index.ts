@@ -2,17 +2,12 @@
  * Interface representing basic object detection results
  */
 export interface Detection {
-  /** Bounding box [x, y, width, height] */
+  /** Bounding box [centerX, centerY, width, height] - center coordinates from YOLO */
   boundingBox: [number, number, number, number];
   /** Rotation angle (degrees) - default value is 0 degrees */
   angle: number;
   /** Confidence score (0.0-1.0) */
   score: number;
-  /** 2D center position calculated from bounding box */
-  center2D: {
-    x: number; // Center X coordinate in canvas pixels
-    y: number; // Center Y coordinate in canvas pixels
-  };
 }
 
 /**

@@ -47,8 +47,7 @@ Access http://localhost:3000 in your browser to view two demos:
 
 | Property      | Type                               | Description                                      |
 | ------------- | ---------------------------------- | ------------------------------------------------ |
-| `boundingBox` | `[number, number, number, number]` | Object position and size `[x, y, width, height]` |
-| `center2D`    | `{x: number, y: number}`           | Center coordinates in canvas pixels              |
+| `boundingBox` | `[number, number, number, number]` | Object position and size `[centerX, centerY, width, height]` |
 | `angle`       | `number`                           | Rotation angle in degrees                        |
 | `score`       | `number`                           | Confidence score (0.0-1.0)                       |
 
