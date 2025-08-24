@@ -58,9 +58,6 @@ Access http://localhost:3000 in your browser to view two demos:
 | `depth`             | `number` | Distance from camera in meters              |
 | `orientation.pitch` | `number` | Up-down tilt angle (-90 to 90 degrees)      |
 | `orientation.roll`  | `number` | Left-right tilt angle (-180 to 180 degrees) |
-| `position3D.x`      | `number` | 3D space X coordinate for Three.js          |
-| `position3D.y`      | `number` | 3D space Y coordinate for Three.js          |
-| `position3D.z`      | `number` | 3D space Z coordinate for Three.js          |
 
 ## DetectionController Methods
 

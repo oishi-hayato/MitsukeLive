@@ -7,7 +7,7 @@ export default defineConfig({
       entry: "src/main.ts",
       name: "MitsukeLive",
       formats: ["es"],
-      fileName: () => "index.js",
+      fileName: () => "main.js",
     },
     rollupOptions: {
       external: [],
@@ -19,6 +19,7 @@ export default defineConfig({
       },
     },
     sourcemap: true,
+    minify: false,
   },
   plugins: [
     dts({
