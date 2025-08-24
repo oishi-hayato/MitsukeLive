@@ -256,14 +256,10 @@ export class DetectionController {
 
       // Add 3D information if 3D estimation is enabled and settings are configured
       if (this.enable3D && this.threeDOptions) {
-        const cameraFov = this.threeDOptions.cameraFov ?? 50; // Default FOV for common webcams and Three.js compatibility
         result = add3DToDetection(
           result,
           this.canvas.width,
           this.threeDOptions.objectSize,
-          this.canvas.width,
-          this.canvas.height,
-          cameraFov,
         ) as ARDetection;
       }
 

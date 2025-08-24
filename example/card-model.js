@@ -3,42 +3,18 @@
  * Creates various types of 3D card models for AR/3D examples
  */
 
-/**
- * Create a simple card model with thickness
- * @param {number} width - Card width in meters
- * @param {number} height - Card height in meters
- * @param {number} color - Card color (hex)
- * @param {number} thickness - Card thickness in meters (default: 0.0005 = 0.5mm)
- * @param {number} opacity - Card opacity (0.0 to 1.0, default: 1.0)
- * @param {number} gloss - Gloss level (0.0 to 1.0, default: 0.6)
- * @returns {THREE.Mesh} Card mesh
- */
-export function createSimpleCard(
-  width = 0.005,
-  height = 0.005,
-  color = 0xff0000,
-  thickness = 0.0005,
-  opacity = 1.0,
-  gloss = 0.6
-) {
-  const geometry = new THREE.BoxGeometry(width, height, thickness);
-  const material = new THREE.MeshPhysicalMaterial({
-    color: color,
-    opacity: opacity,
-    transparent: opacity < 1.0,
-    metalness: 0.4, // Higher metalness for more shine
-    roughness: 0.15 - gloss * 0.1, // Much smoother surface (0.15 base), gloss 0 = 0.15 roughness
-    reflectivity: 0.95 + gloss * 0.05, // Very high reflectivity (0.95 base)
-    clearcoat: 0.8 + gloss * 0.2, // Strong clearcoat (0.8 base)
-    clearcoatRoughness: 0.1 - gloss * 0.08, // Very smooth clearcoat (0.1 base)
-    envMapIntensity: 1.5 + gloss * 1.0, // Strong environment map reflection
-    ior: 1.5, // Index of refraction for more realistic reflections
-    sheen: 0.3, // Add sheen for fabric-like highlights
-    sheenRoughness: 0.5,
-  });
-
-  return new THREE.Mesh(geometry, material);
-}
+// Card configuration constants
+const DEFAULT_CARD_CONFIG = {
+  WIDTH_RATIO: 0.67, // Width ratio relative to height
+  HEIGHT: 1.0, // Height (base unit)
+  DEPTH: 0.02, // Thickness (extrusion depth)
+  BEVEL: 0.02, // Corner roundness
+  METALNESS: 0.5, // Metallic appearance
+  ROUGHNESS: 1.0, // Surface roughness
+  OPACITY: 0.6, // Transparency
+  GLOSS: 0.1, // Glossiness level
+  COLOR: 0x000000, // Color (black)
+};
 
 /**
  * Create a glossy black card with rounded corners
@@ -51,12 +27,12 @@ export function createSimpleCard(
  * @returns {THREE.Mesh} Glossy card mesh
  */
 export function createGlossyCard(
-  width = 0.03,
-  height = 0.035,
-  thickness = 0.0004,
-  cornerRadius = 0.002,
-  opacity = 1.0,
-  gloss = 0.6
+  width = DEFAULT_CARD_CONFIG.HEIGHT * DEFAULT_CARD_CONFIG.WIDTH_RATIO,
+  height = DEFAULT_CARD_CONFIG.HEIGHT,
+  thickness = DEFAULT_CARD_CONFIG.DEPTH,
+  cornerRadius = DEFAULT_CARD_CONFIG.BEVEL,
+  opacity = DEFAULT_CARD_CONFIG.OPACITY,
+  gloss = DEFAULT_CARD_CONFIG.GLOSS
 ) {
   // Create rounded rectangle shape
   const shape = new THREE.Shape();
@@ -87,15 +63,15 @@ export function createGlossyCard(
 
   const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
 
-  // Create optimized glossy black material (reduced complexity for better performance)
+  // Create optimized glossy material using config values
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0x000000, // Black color
-    metalness: 0.2, // Moderate metalness
-    roughness: Math.max(0.05, 0.15 - gloss * 0.1), // Moderate smoothness
-    reflectivity: Math.max(0.8, 0.8 + gloss * 0.2), // Good reflectivity
-    clearcoat: Math.max(0.6, 0.6 + gloss * 0.4), // Moderate clearcoat
-    clearcoatRoughness: Math.max(0.05, 0.1 - gloss * 0.05), // Moderate clearcoat smoothness
-    envMapIntensity: Math.max(1.0, 1.0 + gloss * 0.5), // Reduced environment reflections
+    color: DEFAULT_CARD_CONFIG.COLOR,
+    metalness: DEFAULT_CARD_CONFIG.METALNESS,
+    roughness: Math.max(0.05, DEFAULT_CARD_CONFIG.ROUGHNESS - gloss * 0.1),
+    reflectivity: Math.max(0.8, 0.8 + gloss * 0.2),
+    clearcoat: Math.max(0.6, 0.6 + gloss * 0.4),
+    clearcoatRoughness: Math.max(0.05, 0.1 - gloss * 0.05),
+    envMapIntensity: Math.max(1.0, 1.0 + gloss * 0.5),
     opacity: opacity,
     transparent: opacity < 1.0,
     // Remove expensive transmission and IOR for better performance
@@ -110,7 +86,7 @@ export function createGlossyCard(
  * @param {number} color - Wireframe color (hex)
  * @returns {THREE.Mesh} Wireframe cube mesh
  */
-export function createDebugCube(size = 0.01, color = 0x00ff00) {
+export function createDebugCube(size = DEFAULT_CARD_CONFIG.HEIGHT, color = 0x00ff00) {
   const geometry = new THREE.BoxGeometry(size, size, size);
   const material = new THREE.MeshBasicMaterial({
     color: color,

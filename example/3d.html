@@ -18,10 +18,14 @@
     <script type="module">
       import * as MitsukeLive from "../dist/index.js";
       import {
-        createSimpleCard,
         createGlossyCard,
         setupSceneLighting,
       } from "./card-model.js";
+
+      import {
+        updateObjectWithSmoothing,
+        createSmoothTransformState,
+      } from "../dist/index.js";
 
       const { createApp, ref, onMounted, onUnmounted } = Vue;
 
@@ -34,6 +38,7 @@
       const DETECTOR_OPTIONS = {
         detection: {
           continuousDetection: true,
+          inferenceInterval: 100, // Detection frequency: 100ms (10fps)
           scoreThreshold: 0.7, // Only detect objects with 70% or higher confidence
         },
         threeDEstimation: {
@@ -68,13 +73,11 @@
           let cards = [];
           let animationId = null;
 
-          // Animation and interpolation variables
+          // Animation and interpolation variables (optimized for performance)
           let lastTime = 0;
-          const targetFPS = 30;
+          const targetFPS = 30; // Reduce to 20 FPS for better performance
           const frameInterval = 1000 / targetFPS;
-          let targetPosition = new THREE.Vector3(0, 0, 0);
-          let targetRotation = new THREE.Euler(0, 0, 0);
-          let targetScale = new THREE.Vector3(1, 1, 1);
+          let smoothState = createSmoothTransformState();
 
           // Detection variables
           let detector = null;
@@ -112,107 +115,62 @@
             );
             camera.position.z = 0;
 
-            // Create single transparent glass card
-            const card = createGlossyCard(0.03, 0.035, 0.0004, 0.002, 0.5, 1.0);
+            // Create card - Use truly simple card for better performance
+            const card = createGlossyCard();
             card.visible = false;
             card.userData = { name: "card", index: 0 };
             cards.push(card);
             scene.add(card);
 
-            // Set up optimized lighting for card materials
+            // Advanced lighting (heavy)
             setupSceneLighting(scene);
           };
 
           // Use Three.js built-in linear interpolation
           const lerp = THREE.MathUtils.lerp;
 
-          // Three.js animation loop (30 FPS with smooth interpolation)
+          // Optimized animation loop (20 FPS for performance)
           const animate = (currentTime) => {
             animationId = requestAnimationFrame(animate);
 
             if (currentTime - lastTime >= frameInterval) {
-              // Smooth interpolation for card movement
-              const card = cards[0];
-              if (card && card.visible) {
-                const lerpFactor = 0.15; // Smooth factor
+              // Only render if there are visible objects
+              const hasVisibleObjects = cards.some((card) => card.visible);
 
-                // Smooth interpolation using Three.js Vector methods
-                card.position.lerp(targetPosition, lerpFactor);
-                card.rotation.x = lerp(
-                  card.rotation.x,
-                  targetRotation.x,
-                  lerpFactor
-                );
-                card.rotation.z = lerp(
-                  card.rotation.z,
-                  targetRotation.z,
-                  lerpFactor
-                );
-                card.scale.lerp(targetScale, lerpFactor);
-              }
-
-              if (renderer && scene && camera) {
+              if (renderer && scene && camera && hasVisibleObjects) {
                 renderer.render(scene, camera);
               }
               lastTime = currentTime;
             }
           };
 
-          // Update 3D card position with smooth interpolation
+          // Update 3D card position with smooth animation
           const update3DObject = (detection) => {
             if (cards.length === 0 || !camera || !renderer) return;
 
-            const [x, y, width, height] = detection.boundingBox;
             const detectionCanvas = document.getElementById("canvas");
-            const canvasWidth = detectionCanvas.width;
-            const canvasHeight = detectionCanvas.height;
+            const viewport = {
+              displayWidth: detectionCanvas.width,
+              displayHeight: detectionCanvas.height,
+              detectionWidth: detectionCanvas.width,
+              detectionHeight: detectionCanvas.height,
+              fov: camera.fov,
+            };
 
-            // Calculate center coordinates of detection box
-            const centerX = x + width / 2;
-            const centerY = y + height / 2;
-
-            // Convert to Three.js world coordinates
-            const aspect = canvasWidth / canvasHeight;
-            const fov = (camera.fov * Math.PI) / 180;
-            const depth = detection.depth;
-
-            // Calculate view width and height from FOV
-            const viewHeight = 2 * Math.tan(fov / 2) * depth;
-            const viewWidth = viewHeight * aspect;
-
-            // Convert to normalized coordinates (-1 to 1)
-            const normalizedX = (centerX / canvasWidth) * 2 - 1;
-            const normalizedY = -((centerY / canvasHeight) * 2 - 1);
-
-            // Convert to world coordinates
-            const worldX = normalizedX * (viewWidth / 2);
-            const worldY = normalizedY * (viewHeight / 2);
-            const worldZ = -depth;
-
-            // Update target values for smooth interpolation
+            const halfTanFov = Math.tan((camera.fov * Math.PI) / 180 / 2);
             const card = cards[0];
+
             if (card) {
-              // Update target values using Three.js methods
-              targetPosition.set(worldX, worldY, worldZ);
-              targetRotation.set(
-                (detection.orientation.pitch * Math.PI) / 180,
-                0,
-                (detection.orientation.roll * Math.PI) / 180
+              // One function call with optimized smooth animation
+              updateObjectWithSmoothing(
+                card,
+                smoothState,
+                detection,
+                viewport,
+                halfTanFov,
+                0.15 // Increase smoothing to reduce calculation frequency
+                // scale multiplier uses default
               );
-
-              const baseScale = 0.3;
-              const scale = baseScale / Math.max(depth, 0.1);
-              targetScale.set(scale, scale, scale);
-
-              // Show card if not visible
-              if (!card.visible) {
-                card.visible = true;
-                // Set initial position immediately for first display
-                card.position.set(worldX, worldY, worldZ);
-                card.rotation.x = targetRotation.x;
-                card.rotation.z = targetRotation.z;
-                card.scale.set(scale * 0.1, scale * 0.1, scale * 0.1);
-              }
             }
           };
 

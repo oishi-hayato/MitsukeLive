@@ -1,0 +1,18 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "lerp",
+    "tfjs",
+    "webgpu",
+    "imgsz",
+    "arccos",
+    "mitsuke"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    "dist/**",
+    "coverage/**",
+    "*.min.js"
+  ]
+}

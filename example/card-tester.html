@@ -241,7 +241,6 @@
 
     <script type="module">
       import {
-        createSimpleCard,
         createGlossyCard,
         createDebugCube,
         setupSceneLighting,
@@ -342,7 +341,7 @@
         // Create new card based on type
         switch (cardType) {
           case "simple":
-            currentCard = createSimpleCard(
+            currentCard = createGlossyCard(
               cardSize,
               cardSize * 1.4, // Make height 40% taller
               cardColor,

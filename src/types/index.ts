@@ -21,12 +21,6 @@ export interface ARDetection extends Detection {
     pitch: number; // Up-down tilt (-90 to 90 degrees)
     roll: number; // Left-right tilt (-180 to 180 degrees)
   };
-  /** 3D space coordinates for Three.js rendering */
-  position3D?: {
-    x: number; // Space X coordinate
-    y: number; // Space Y coordinate
-    z: number; // Space Z coordinate
-  };
 }
 
 /**
