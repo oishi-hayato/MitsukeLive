@@ -346,33 +346,6 @@ export function showTopLevelGroup(group: THREE.Group): void {
 }
 
 /**
- * Find objects in Group for raycasting
- * Search objects within Group (for click handling)
- */
-export function getGroupObjects(
-  group: THREE.Group,
-  recursive: boolean = true,
-): THREE.Object3D[] {
-  const objects: THREE.Object3D[] = [];
-
-  if (recursive) {
-    group.traverse((child) => {
-      if (child !== group && child instanceof THREE.Mesh) {
-        objects.push(child);
-      }
-    });
-  } else {
-    for (const child of group.children) {
-      if (child instanceof THREE.Mesh) {
-        objects.push(child);
-      }
-    }
-  }
-
-  return objects;
-}
-
-/**
  * Calculate position and transform data without applying to object
  *
  * Returns calculated position, rotation, and scale values for AR objects
