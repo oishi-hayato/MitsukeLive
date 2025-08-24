@@ -12,14 +12,10 @@ export default defineConfig({
     rollupOptions: {
       external: [],
       output: {
-        manualChunks: {
-          tensorflow: ["@tensorflow/tfjs"],
-          yaml: ["js-yaml"],
-          inference: [
-            "src/lib/detection-controller.ts",
-            "src/lib/yolo-inference.ts",
-          ],
-        },
+        preserveModules: true,
+        preserveModulesRoot: "src",
+        entryFileNames: "[name].js",
+        manualChunks: undefined, // Disable manual chunking for individual files
       },
     },
     sourcemap: true,

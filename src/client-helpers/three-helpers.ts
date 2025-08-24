@@ -496,25 +496,3 @@ export function applySmoothTransform(
 
   object.scale.lerp(state.targetScale, lerpFactor);
 }
-
-/**
- * Update object with smooth animation (high-level API)
- */
-export function updateObjectWithSmoothing(
-  object: THREE.Object3D,
-  state: SmoothTransformState,
-  detection: ARDetection,
-  viewport: ViewportConfig,
-  halfTanFov: number,
-  lerpFactor: number = 0.15,
-  scaleMultiplier: number = 1.0,
-): void {
-  // Update target values
-  updateSmoothTargets(state, detection, viewport, halfTanFov, scaleMultiplier);
-
-  // Apply smooth interpolation
-  applySmoothTransform(object, state, lerpFactor);
-
-  // Show object
-  object.visible = true;
-}

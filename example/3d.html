@@ -16,16 +16,14 @@
     <div id="app"></div>
 
     <script type="module">
-      import * as MitsukeLive from "../dist/index.js";
-      import {
-        createGlossyCard,
-        setupSceneLighting,
-      } from "./card-model.js";
+      import * as MitsukeLive from "../dist/main.js";
+      import { createGlossyCard, setupSceneLighting } from "./card-model.js";
 
-      import {
-        updateObjectWithSmoothing,
+      const {
+        updateSmoothTargets,
         createSmoothTransformState,
-      } from "../dist/index.js";
+        applySmoothTransform,
+      } = MitsukeLive;
 
       const { createApp, ref, onMounted, onUnmounted } = Vue;
 
@@ -71,6 +69,7 @@
           let camera = null;
           let renderer = null;
           let cards = [];
+          let mainGroup = null;
           let animationId = null;
 
           // Animation and interpolation variables (optimized for performance)
@@ -115,12 +114,16 @@
             );
             camera.position.z = 0;
 
-            // Create card - Use truly simple card for better performance
+            // Create main group for cards
+            mainGroup = new THREE.Group();
+            mainGroup.visible = false;
+            scene.add(mainGroup);
+
+            // Create card and add to group
             const card = createGlossyCard();
-            card.visible = false;
             card.userData = { name: "card", index: 0 };
             cards.push(card);
-            scene.add(card);
+            mainGroup.add(card);
 
             // Advanced lighting (heavy)
             setupSceneLighting(scene);
@@ -129,49 +132,45 @@
           // Use Three.js built-in linear interpolation
           const lerp = THREE.MathUtils.lerp;
 
-          // Optimized animation loop (20 FPS for performance)
+          // Optimized animation loop with smooth interpolation
           const animate = (currentTime) => {
             animationId = requestAnimationFrame(animate);
 
             if (currentTime - lastTime >= frameInterval) {
-              // Only render if there are visible objects
-              const hasVisibleObjects = cards.some((card) => card.visible);
+              // Apply smooth transform only if main group is visible
+              if (mainGroup && mainGroup.visible) {
+                cards.forEach((card) => {
+                  applySmoothTransform(card, smoothState, 0.15);
+                });
+              }
 
-              if (renderer && scene && camera && hasVisibleObjects) {
+              // Only render if main group is visible
+              const shouldRender = mainGroup && mainGroup.visible;
+
+              if (renderer && scene && camera && shouldRender) {
                 renderer.render(scene, camera);
               }
               lastTime = currentTime;
             }
           };
 
-          // Update 3D card position with smooth animation
-          const update3DObject = (detection) => {
-            if (cards.length === 0 || !camera || !renderer) return;
+          // Update card position based on detection
+          const updateCardPosition = (detection) => {
+            if (!cards[0] || !camera) return;
 
-            const detectionCanvas = document.getElementById("canvas");
+            const canvas = document.getElementById("canvas");
             const viewport = {
-              displayWidth: detectionCanvas.width,
-              displayHeight: detectionCanvas.height,
-              detectionWidth: detectionCanvas.width,
-              detectionHeight: detectionCanvas.height,
+              displayWidth: canvas.width,
+              displayHeight: canvas.height,
+              detectionWidth: canvas.width,
+              detectionHeight: canvas.height,
               fov: camera.fov,
             };
 
             const halfTanFov = Math.tan((camera.fov * Math.PI) / 180 / 2);
-            const card = cards[0];
 
-            if (card) {
-              // One function call with optimized smooth animation
-              updateObjectWithSmoothing(
-                card,
-                smoothState,
-                detection,
-                viewport,
-                halfTanFov,
-                0.15 // Increase smoothing to reduce calculation frequency
-                // scale multiplier uses default
-              );
-            }
+            // Set target position for smooth animation
+            updateSmoothTargets(smoothState, detection, viewport, halfTanFov);
           };
 
           // Format detection information
@@ -183,32 +182,55 @@
             box: detection.boundingBox.map((v) => Math.round(v)),
           });
 
-          // Handle detection with 500ms timeout
+          // Show cards when detection found
+          const showCards = (detection) => {
+            state.detectionInfo.value = formatDetectionInfo(detection);
+            updateCardPosition(detection);
+
+            if (mainGroup) {
+              mainGroup.visible = true;
+              if (!animationId) animate(performance.now());
+            }
+
+            if (hideTimeout) {
+              clearTimeout(hideTimeout);
+              hideTimeout = null;
+            }
+          };
+
+          // Hide cards after 500ms delay
+          const hideCards = () => {
+            if (hideTimeout) return;
+
+            hideTimeout = setTimeout(() => {
+              state.detectionInfo.value = null;
+
+              if (mainGroup) {
+                mainGroup.visible = false;
+                if (animationId) {
+                  cancelAnimationFrame(animationId);
+                  animationId = null;
+                }
+                if (renderer && scene && camera) {
+                  renderer.render(scene, camera);
+                }
+              }
+              hideTimeout = null;
+            }, 500);
+          };
+
+          // Main detection handler
           const handleDetection = (detection) => {
             if (!state.isDetecting.value) return;
 
-            if (detection) {
-              state.detectionInfo.value = formatDetectionInfo(detection);
-              update3DObject(detection);
-              lastDetectionTime = Date.now();
+            const isValidDetection =
+              detection?.depth !== undefined &&
+              detection?.orientation !== undefined;
 
-              // Clear any existing hide timeout
-              if (hideTimeout) {
-                clearTimeout(hideTimeout);
-                hideTimeout = null;
-              }
+            if (isValidDetection) {
+              showCards(detection);
             } else {
-              state.detectionInfo.value = null;
-
-              // Set timeout to hide card after 500ms
-              if (!hideTimeout) {
-                hideTimeout = setTimeout(() => {
-                  cards.forEach((card) => {
-                    card.visible = false;
-                  });
-                  hideTimeout = null;
-                }, 500);
-              }
+              hideCards();
             }
           };
 
