@@ -7,22 +7,19 @@ export default defineConfig({
       entry: "src/main.ts",
       name: "MitsukeLive",
       formats: ["es"],
-      fileName: () => "index.js",
+      fileName: () => "main.js",
     },
     rollupOptions: {
       external: [],
       output: {
-        manualChunks: {
-          tensorflow: ["@tensorflow/tfjs"],
-          yaml: ["js-yaml"],
-          inference: [
-            "src/lib/detection-controller.ts",
-            "src/lib/yolo-inference.ts",
-          ],
-        },
+        preserveModules: true,
+        preserveModulesRoot: "src",
+        entryFileNames: "[name].js",
+        manualChunks: undefined, // Disable manual chunking for individual files
       },
     },
     sourcemap: true,
+    minify: false,
   },
   plugins: [
     dts({

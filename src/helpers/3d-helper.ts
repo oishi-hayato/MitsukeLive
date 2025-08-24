@@ -1,5 +1,5 @@
 import { MLInternalError } from "../errors";
-import { Detection, ARDetection } from "../types";
+import type { Detection, ARDetection } from "../types";
 
 // Constants
 const CONSISTENCY_EPS = 0.25; // 25% tolerance for width/height-based depth agreement
@@ -46,7 +46,7 @@ function calculatePitchFromRatio(ratioDiff: number): number {
 function calculateOrientationFromAspectRatio(
   currentAspectRatio: number,
   expectedAspectRatio: number,
-  angle: number
+  angle: number,
 ): { pitch: number; roll: number } {
   // Determine if the aspect ratio change is primarily due to pitch or roll rotation
   if (Math.abs(angle) < 5) {
@@ -91,7 +91,7 @@ export function estimate3DInfo(
   boundingBox: [number, number, number, number],
   imageWidth: number,
   objectSize: { width: number; height: number },
-  angle: number
+  angle: number,
 ) {
   const [, , width, height] = boundingBox;
 
@@ -124,15 +124,15 @@ export function estimate3DInfo(
     Math.abs(depthFromWidth - depthFromHeight) /
     Math.max(
       Math.max(depthFromWidth, depthFromHeight),
-      DIVISION_SAFETY_EPSILON
+      DIVISION_SAFETY_EPSILON,
     );
 
-  let depth =
+  const depth =
     relDiff <= CONSISTENCY_EPS
       ? 0.5 * (depthFromWidth + depthFromHeight)
       : height > width
-      ? depthFromHeight
-      : depthFromWidth;
+        ? depthFromHeight
+        : depthFromWidth;
 
   // No artificial depth constraints - let physics and detection limits apply naturally
 
@@ -150,7 +150,7 @@ export function estimate3DInfo(
 function estimateOrientation(
   boundingBox: [number, number, number, number],
   realSize: { width: number; height: number; aspectRatio: number },
-  angle: number = 0
+  angle: number = 0,
 ): { pitch: number; roll: number } {
   const [, , width, height] = boundingBox;
 
@@ -164,7 +164,7 @@ function estimateOrientation(
   return calculateOrientationFromAspectRatio(
     currentAspectRatio,
     expectedAspectRatio,
-    angle
+    angle,
   );
 }
 
@@ -174,13 +174,13 @@ function estimateOrientation(
 export function add3DToDetection(
   detection: Detection,
   imageWidth: number,
-  objectSize: { width: number; height: number }
+  objectSize: { width: number; height: number },
 ): ARDetection {
   const info = estimate3DInfo(
     detection.boundingBox,
     imageWidth,
     objectSize,
-    detection.angle
+    detection.angle,
   );
 
   return {

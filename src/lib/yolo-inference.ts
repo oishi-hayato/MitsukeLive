@@ -41,7 +41,7 @@ export class YOLOInference {
   public async predict(
     imageTensor: tf.Tensor4D,
     letterboxInfo?: LetterboxInfo,
-    canvasElement?: HTMLCanvasElement
+    canvasElement?: HTMLCanvasElement,
   ): Promise<Detection[]> {
     if (!this.model) {
       throw new MLInternalError("MODEL_NOT_INITIALIZED");
@@ -56,7 +56,7 @@ export class YOLOInference {
         predictions = transformToCanvas(
           predictions,
           letterboxInfo,
-          canvasElement
+          canvasElement,
         );
       }
 
@@ -137,7 +137,7 @@ export class YOLOInference {
       const detectionList = findValidDetections(
         data,
         numDetections,
-        this.scoreThreshold
+        this.scoreThreshold,
       );
 
       return detectionList;
@@ -153,15 +153,13 @@ export class YOLOInference {
     const memoryInfo = tf.memory();
     console.info(
       `[YOLOEngine] Memory: ${memoryInfo.numTensors} tensors, ${(
-        memoryInfo.numBytes /
-        1024 /
-        1024
-      ).toFixed(2)}MB`
+        memoryInfo.numBytes / 1024 / 1024
+      ).toFixed(2)}MB`,
     );
 
     if (memoryInfo.numTensors > this.memoryThreshold) {
       console.warn(
-        `[YOLOEngine] High tensor count detected: ${memoryInfo.numTensors} (threshold: ${this.memoryThreshold})`
+        `[YOLOEngine] High tensor count detected: ${memoryInfo.numTensors} (threshold: ${this.memoryThreshold})`,
       );
       this.cleanupMemory();
     }
@@ -176,7 +174,7 @@ export class YOLOInference {
     console.info(
       `[YOLOEngine] Memory cleanup completed: ${
         memoryInfo.numTensors
-      } tensors, ${(memoryInfo.numBytes / 1024 / 1024).toFixed(2)}MB`
+      } tensors, ${(memoryInfo.numBytes / 1024 / 1024).toFixed(2)}MB`,
     );
   }
 }

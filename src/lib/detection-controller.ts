@@ -33,6 +33,7 @@ enum DetectionState {
   IDLE = "idle", // Idle state (detection ready)
   PROCESSING = "processing", // Detection processing in progress
   PAUSED = "paused", // Paused
+  DETECTION_PAUSED = "detection_paused", // Detection paused (camera continues)
 }
 
 export class DetectionController {
@@ -59,9 +60,6 @@ export class DetectionController {
 
   private threeDOptions?: ObjectDetectorOptions["threeDEstimation"]; // 3D estimation options
 
-  // Continuous detection settings
-  private continuousDetection: boolean; // Whether to enable continuous detection mode
-
   /**
    * Controller initial configuration
    * @param modelPath Path to TensorFlow.js model file
@@ -71,7 +69,7 @@ export class DetectionController {
   constructor(
     modelPath: string,
     metadataPath: string,
-    options: ObjectDetectorOptions = {}
+    options: ObjectDetectorOptions = {},
   ) {
     this.detectionIntervalMs =
       options.detection?.inferenceInterval || DEFAULT_INFERENCE_INTERVAL_MS;
@@ -92,9 +90,6 @@ export class DetectionController {
     // 3D estimation configuration
     this.enable3D = !!options.threeDEstimation;
     this.threeDOptions = options.threeDEstimation;
-
-    // Continuous detection configuration
-    this.continuousDetection = options.detection?.continuousDetection || false;
   }
 
   /**
@@ -104,7 +99,7 @@ export class DetectionController {
    */
   public async initialize(
     videoElementId: string,
-    canvasElementId: string
+    canvasElementId: string,
   ): Promise<void> {
     // TensorFlow.js backend configuration
     await this.setupBackend();
@@ -129,7 +124,7 @@ export class DetectionController {
   private async setupCamera(videoElementId: string): Promise<void> {
     this.cameraManager = await CameraManager.setup(
       videoElementId,
-      this.onCameraReady
+      this.onCameraReady,
     );
   }
 
@@ -152,7 +147,7 @@ export class DetectionController {
       cropX,
       cropY,
       croppedWidth,
-      croppedHeight
+      croppedHeight,
     );
 
     // Process detection results
@@ -254,7 +249,7 @@ export class DetectionController {
    * @param detectionResults Detection results array
    */
   private handleDetectionResults(
-    detectionResults: Detection[] | ARDetection[]
+    detectionResults: Detection[] | ARDetection[],
   ): void {
     if (detectionResults.length > 0) {
       let result = detectionResults[0];
@@ -264,22 +259,15 @@ export class DetectionController {
         result = add3DToDetection(
           result,
           this.canvas.width,
-          this.threeDOptions.objectSize
+          this.threeDOptions.objectSize,
         ) as ARDetection;
       }
 
       // Notify highest score detection result
       this.onDetection(result);
-
-      // Pause only if not in continuous detection mode
-      if (!this.continuousDetection) {
-        this.pause();
-      }
     } else {
-      // In continuous detection mode, also notify when no detection was made
-      if (this.continuousDetection) {
-        this.onDetection(null);
-      }
+      // Notify when no detection was made
+      this.onDetection(null);
     }
   }
 
@@ -298,10 +286,17 @@ export class DetectionController {
   /**
    * Pause detection processing
    * Detection loop continues but skips actual inference processing
+   * @param options Pause options. If pauseCamera is false, only pauses detection (camera continues).
    */
-  public pause(): void {
-    this.detectionState = DetectionState.PAUSED;
-    this.video.pause();
+  public pause(
+    options: { pauseCamera?: boolean } = { pauseCamera: true },
+  ): void {
+    if (options.pauseCamera) {
+      this.detectionState = DetectionState.PAUSED;
+      this.video.pause();
+    } else {
+      this.detectionState = DetectionState.DETECTION_PAUSED;
+    }
   }
 
   /**
@@ -372,7 +367,7 @@ export class DetectionController {
     cropX: number,
     cropY: number,
     croppedWidth: number,
-    croppedHeight: number
+    croppedHeight: number,
   ): Promise<{
     detectionResults: Detection[];
     letterboxInfo: LetterboxInfo;
@@ -389,7 +384,7 @@ export class DetectionController {
           cropX,
           cropY,
           croppedWidth,
-          croppedHeight
+          croppedHeight,
         );
 
         // Apply letterbox transformation to match YOLO model input size
@@ -398,7 +393,7 @@ export class DetectionController {
           letterboxInfo: letterboxTransformResult,
         } = letterboxTransform(
           normalizedCroppedTensor,
-          this.yoloInference.metadataInstance.imgsz
+          this.yoloInference.metadataInstance.imgsz,
         );
 
         // Add crop information needed for coordinate transformation
@@ -421,7 +416,7 @@ export class DetectionController {
       const detectionResults = await this.yoloInference.predict(
         preprocessedInputTensor,
         letterboxTransformInfo,
-        this.canvas
+        this.canvas,
       );
 
       return { detectionResults, letterboxInfo: letterboxTransformInfo };
@@ -548,7 +543,7 @@ export class DetectionController {
     console.info(
       `Disposed - Final memory state: ${memoryStats.numTensors} tensors, ${(
         memoryStats.numBytes / BYTES_TO_MB
-      ).toFixed(2)}MB`
+      ).toFixed(2)}MB`,
     );
   }
 

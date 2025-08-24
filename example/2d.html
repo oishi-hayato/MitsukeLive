@@ -15,7 +15,7 @@
     <div id="app"></div>
 
     <script type="module">
-      import * as MitsukeLive from "../dist/index.js";
+      import * as MitsukeLive from "mitsuke-live";
 
       const { createApp, ref, onMounted, onUnmounted } = Vue;
 
@@ -53,10 +53,16 @@
           let detector = null;
 
           // Format detection information
-          const formatDetectionInfo = (detection) => ({
-            score: (detection.score * 100).toFixed(1),
-            box: detection.boundingBox.map((v) => Math.round(v)),
-          });
+          const formatDetectionInfo = (detection) => {
+            if (!detection) return null;
+
+            return {
+              score: (detection.score * 100).toFixed(1),
+              box: detection.boundingBox?.map((v) => Math.round(v)) || [
+                0, 0, 0, 0,
+              ],
+            };
+          };
 
           // Handle detection
           const handleDetection = async (detection) => {
@@ -73,7 +79,8 @@
                 FLASH_CONFIG
               );
 
-              // Update state after detection completion
+              // Pause detection and update state
+              detector.pause();
               state.isDetecting.value = false;
               state.status.value = MESSAGES.DETECTION_COMPLETE;
             }
@@ -172,7 +179,7 @@
                   <span class="info__value monospace">{{ detectionInfo.score }}%</span>
                 </div>
                 <div class="info__item">
-                  <span class="info__label">Position:</span>
+                  <span class="info__label">BBox:</span>
                   <span class="info__value monospace">[{{ detectionInfo.box.join(', ') }}]</span>
                 </div>
               </div>

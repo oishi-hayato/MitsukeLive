@@ -11,7 +11,7 @@ export class CanvasManager {
 
   private constructor(
     canvas: HTMLCanvasElement,
-    context: CanvasRenderingContext2D
+    context: CanvasRenderingContext2D,
   ) {
     this.canvas = canvas;
     this.context = context;

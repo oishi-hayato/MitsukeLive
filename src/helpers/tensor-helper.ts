@@ -23,12 +23,12 @@ export function cropNormalizedVideoTensor(
   cropX: number,
   cropY: number,
   width: number,
-  height: number
+  height: number,
 ): tf.Tensor3D {
   const fullImage = getNormalizedVideoTensor(videoElement);
 
   return fullImage.slice(
     [Math.floor(cropY), Math.floor(cropX), 0],
-    [Math.floor(height), Math.floor(width), 3]
+    [Math.floor(height), Math.floor(width), 3],
   );
 }

@@ -2,7 +2,7 @@
  * Interface representing basic object detection results
  */
 export interface Detection {
-  /** Bounding box [x, y, width, height] */
+  /** Bounding box [centerX, centerY, width, height] - center coordinates from YOLO */
   boundingBox: [number, number, number, number];
   /** Rotation angle (degrees) - default value is 0 degrees */
   angle: number;
@@ -33,8 +33,6 @@ export interface ObjectDetectorOptions {
     inferenceInterval?: number;
     /** Minimum confidence score for detection. Default: 0.7 */
     scoreThreshold?: number;
-    /** Enable continuous detection mode (don't pause after detection) */
-    continuousDetection?: boolean;
   };
 
   /** 3D estimation settings */
@@ -48,7 +46,11 @@ export interface ObjectDetectorOptions {
     memoryThreshold?: number;
   };
 
-  /** Callback function called during object detection (null if no detection, ARDetection when 3D estimation is enabled) */
+  /**
+   * Callback function called during object detection
+   * @param detection Detection result (null if no detection, ARDetection when 3D estimation is enabled)
+   * Note: This callback is not called when detection is paused with pause({ pauseCamera: false })
+   */
   onDetection?: (detection: Detection | ARDetection | null) => void;
   /** Callback function called when camera initialization is complete */
   onCameraReady?: () => void;
@@ -116,4 +118,6 @@ export interface ThreeDEstimationOptions {
     width: number;
     height: number;
   };
+  /** Camera field of view in degrees (default: 50) */
+  cameraFov?: number;
 }

@@ -1,6 +1,7 @@
 import type * as tf from "@tensorflow/tfjs";
 import type { LetterboxInfo, Detection } from "../types";
 import { MLInternalError } from "../errors";
+import { convertRadiansToDegrees } from "./math-helper";
 
 // Type aliases
 type BoundingBox = [number, number, number, number];
@@ -8,21 +9,6 @@ type Rect = { x: number; y: number; width: number; height: number };
 type PaddingList = [[number, number], [number, number], [number, number]];
 
 // Constants
-const RADIANS_TO_DEGREES = 180 / Math.PI;
-
-/**
- * Convert radians to degrees
- *
- * @param radians - Radian value (finite numbers only. NaN, Infinity, -Infinity are invalid)
- * @returns Degree value (radian value × 180 / π)
- */
-export function convertRadiansToDegrees(radians: number): number {
-  if (!Number.isFinite(radians)) {
-    throw new MLInternalError("INVALID_RADIAN_VALUE", false);
-  }
-
-  return radians * RADIANS_TO_DEGREES;
-}
 
 /**
  * Scale calculation with aspect ratio preservation
@@ -37,7 +23,7 @@ export function calculateOptimalScale(
   originalWidth: number,
   originalHeight: number,
   targetWidth: number = 640,
-  targetHeight: number = 640
+  targetHeight: number = 640,
 ): { scaleRatio: number; scaledWidth: number; scaledHeight: number } {
   if (originalWidth <= 0 || originalHeight <= 0) {
     throw new MLInternalError("INVALID_IMAGE_DIMENSIONS");
@@ -45,7 +31,7 @@ export function calculateOptimalScale(
 
   const scaleRatio = Math.min(
     targetWidth / originalWidth,
-    targetHeight / originalHeight
+    targetHeight / originalHeight,
   );
   const scaledWidth = Math.round(originalWidth * scaleRatio);
   const scaledHeight = Math.round(originalHeight * scaleRatio);
@@ -67,7 +53,7 @@ export function calculatePadding(
   scaledWidth: number,
   scaledHeight: number,
   letterboxWidth: number = 640,
-  letterboxHeight: number = 640
+  letterboxHeight: number = 640,
 ): {
   top: number;
   left: number;
@@ -102,7 +88,7 @@ export function calculatePadding(
  */
 export function letterboxTransform(
   image: tf.Tensor3D,
-  letterboxShape: [number, number] = [640, 640]
+  letterboxShape: [number, number] = [640, 640],
 ): { output: tf.Tensor3D; letterboxInfo: LetterboxInfo } {
   // Input validation: Check if 3D tensor
   if (image.shape.length !== 3) {
@@ -122,7 +108,7 @@ export function letterboxTransform(
     originalWidth,
     originalHeight,
     letterboxWidth,
-    letterboxHeight
+    letterboxHeight,
   );
 
   // Resized tensor (intermediate object)
@@ -134,7 +120,7 @@ export function letterboxTransform(
       scaledWidth,
       scaledHeight,
       letterboxWidth,
-      letterboxHeight
+      letterboxHeight,
     );
 
     // Image with padding added by letterbox processing
@@ -175,7 +161,7 @@ export function letterboxToOriginal(
   height: number,
   scale: number,
   top: number,
-  left: number
+  left: number,
 ): Rect {
   // Input validation: Check if finite numbers
   if (
@@ -219,7 +205,7 @@ export function letterboxToOriginal(
 export function originalToCanvas(
   rect: Rect,
   canvasElement: HTMLCanvasElement,
-  croppedSize: { width: number; height: number }
+  croppedSize: { width: number; height: number },
 ): Rect {
   // Input validation: Check if finite numbers
   if (
@@ -275,7 +261,7 @@ export function originalToCanvas(
 export function transformToCanvas(
   predictions: Detection[],
   letterboxInfo: LetterboxInfo,
-  canvasElement: HTMLCanvasElement
+  canvasElement: HTMLCanvasElement,
 ): Detection[] {
   // Input validation
   if (!predictions || predictions.length === 0) {
@@ -334,7 +320,7 @@ export function transformToCanvas(
         height,
         scale,
         top,
-        left
+        left,
       );
 
       // Convert from original image coordinates to canvas coordinates
@@ -367,7 +353,7 @@ export function transformToCanvas(
 /**
  * Get detection results above threshold (sorted by score descending)
  *
- * @param data - 2D array of model output data [x[], y[], width[], height[], score[], angle?[]]
+ * @param data - 2D array of model output data [centerX[], centerY[], width[], height[], score[], angle?[]]
  * @param numDetections - Number of detections (>= 0)
  * @param scoreThreshold - Score threshold (0.0-1.0)
  * @returns Array of detection results above score threshold (sorted by score descending)
@@ -375,7 +361,7 @@ export function transformToCanvas(
 export function findValidDetections(
   data: number[][],
   numDetections: number,
-  scoreThreshold: number
+  scoreThreshold: number,
 ): Detection[] {
   // Input validation
   if (
@@ -396,7 +382,7 @@ export function findValidDetections(
     data[1]?.length || 0,
     data[2]?.length || 0,
     data[3]?.length || 0,
-    data[4]?.length || 0
+    data[4]?.length || 0,
   );
 
   if (minRequiredLength === 0) {
@@ -416,15 +402,15 @@ export function findValidDetections(
       continue;
     }
 
-    // Validate bounding box
-    const x = data[0][i];
-    const y = data[1][i];
+    // Validate bounding box - YOLO outputs center coordinates
+    const centerX = data[0][i];
+    const centerY = data[1][i];
     const width = data[2][i];
     const height = data[3][i];
 
     if (
-      !Number.isFinite(x) ||
-      !Number.isFinite(y) ||
+      !Number.isFinite(centerX) ||
+      !Number.isFinite(centerY) ||
       !Number.isFinite(width) ||
       !Number.isFinite(height) ||
       width < 0 ||
@@ -440,7 +426,7 @@ export function findValidDetections(
       angle = Number.isFinite(angleValue) ? angleValue : 0;
     }
 
-    const detectionBBox: BoundingBox = [x, y, width, height];
+    const detectionBBox: BoundingBox = [centerX, centerY, width, height];
     validDetections.push({
       boundingBox: detectionBBox,
       angle,

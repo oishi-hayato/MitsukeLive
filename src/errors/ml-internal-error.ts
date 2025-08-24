@@ -11,7 +11,7 @@ export class MLInternalError extends Error {
   constructor(
     key: keyof typeof ERROR_MESSAGES,
     fatal: boolean = true,
-    error?: Error
+    error?: Error,
   ) {
     const message = ERROR_MESSAGES[key];
     super(message, { cause: error });

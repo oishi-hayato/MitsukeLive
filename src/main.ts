@@ -1,11 +1,13 @@
 // Public API
-export type { ObjectDetectorOptions, Detection, ARDetection } from "./types";
+export type {
+  ObjectDetectorOptions,
+  Detection,
+  ARDetection,
+  ThreeDEstimationOptions,
+} from "./types";
 export type { MLClientError } from "./errors";
-export {
-  startFlashEffect,
-  type VisualEffectOptions,
-} from "./lib/visual-effects";
-export { type ThreeDEstimationOptions } from "./types";
+export type { DetectionController } from "./lib/detection-controller";
+export * from "./client-helpers";
 
 import { DetectionController } from "./lib/detection-controller";
 import type { ObjectDetectorOptions } from "./types";
@@ -19,12 +21,12 @@ export async function createDetector(
   canvasElementId: string,
   modelPath: string,
   metadataPath: string,
-  options: ObjectDetectorOptions = {}
+  options: ObjectDetectorOptions = {},
 ): Promise<DetectionController> {
   const detectionController = new DetectionController(
     modelPath,
     metadataPath,
-    options
+    options,
   );
 
   try {

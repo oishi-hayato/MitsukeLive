@@ -11,6 +11,7 @@ export const ERROR_MESSAGES = {
 
   // YOLO Helper errors
   INVALID_RADIAN_VALUE: "Invalid radian value",
+  INVALID_DEGREE_VALUE: "Invalid degree value",
   INVALID_IMAGE_DIMENSIONS: "Invalid image dimensions specified",
   RESIZED_IMAGE_EXCEEDS_TARGET: "Resized image exceeds target size",
   INPUT_MUST_BE_3D_TENSOR: "Input image must be a 3D tensor",
