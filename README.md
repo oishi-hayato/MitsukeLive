@@ -32,7 +32,7 @@ Access http://localhost:3000 in your browser to view two demos:
 
 | Parameter                            | Type       | Default   | Description                                                          |
 | ------------------------------------ | ---------- | --------- | -------------------------------------------------------------------- |
-| `detection.inferenceInterval`        | `number`   | `500`     | Inference execution interval (milliseconds)                          |
+| `detection.inferenceInterval`        | `number`   | `50`     | Inference execution interval (milliseconds)                          |
 | `detection.scoreThreshold`           | `number`   | `0.7`     | Minimum confidence score for detection (0.0-1.0)                     |
 | `threeDEstimation.objectSize.width`  | `number`   | -         | Real object width in meters (required for 3D mode)                   |
 | `threeDEstimation.objectSize.height` | `number`   | -         | Real object height in meters (required for 3D mode)                  |

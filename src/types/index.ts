@@ -4,7 +4,7 @@
 export interface Detection {
   /** Bounding box [centerX, centerY, width, height] - center coordinates from YOLO */
   boundingBox: [number, number, number, number];
-  /** Rotation angle (degrees) - default value is 0 degrees */
+  /** Yaw angle (degrees) - rotation around Y-axis, default value is 0 degrees → Maps to Three.js rotation.y */
   angle: number;
   /** Confidence score (0.0-1.0) */
   score: number;
@@ -16,10 +16,11 @@ export interface Detection {
 export interface ARDetection extends Detection {
   /** Estimated Z-axis coordinate (in meters, closer to 0 means nearer) */
   depth: number;
-  /** Tilt angle around Z-axis (pitch: up-down tilt, roll: left-right tilt) in degrees */
+  /** Complete 3D orientation angles in degrees (Three.js compatible) */
   orientation: {
-    pitch: number; // Up-down tilt (-90 to 90 degrees)
-    roll: number; // Left-right tilt (-180 to 180 degrees)
+    pitch: number; // Up-down tilt (-90 to 90 degrees) → Maps to Three.js rotation.x
+    roll: number; // Left-right tilt (-180 to 180 degrees) → Maps to Three.js rotation.z
+    yaw: number; // Heading left-right (-180 to 180 degrees) → Maps to Three.js rotation.y (inherited from Detection.angle)
   };
 }
 
@@ -120,4 +121,9 @@ export interface ThreeDEstimationOptions {
   };
   /** Camera field of view in degrees (default: 50) */
   cameraFov?: number;
+  /** Coefficient multipliers for orientation estimation (default: 1.0 for both) */
+  orientationCoefficients?: {
+    pitch?: number; // Multiplier for pitch estimation (default: 1.0)
+    roll?: number; // Multiplier for roll estimation (default: 1.0)
+  };
 }

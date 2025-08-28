@@ -37,32 +37,34 @@ function calculatePitchFromRatio(ratioDiff: number): number {
 }
 
 /**
- * Calculate both pitch and roll from aspect ratio analysis
+ * Calculate complete 3D orientation from aspect ratio analysis
  * @param currentAspectRatio Observed aspect ratio from bounding box
  * @param expectedAspectRatio Expected aspect ratio of object
- * @param angle YOLO rotation angle (determines whether aspect ratio change indicates pitch or roll)
- * @returns Object with pitch and roll angles
+ * @param angle YOLO rotation angle (yaw component)
+ * @param coefficients Multipliers for pitch and roll estimation
+ * @returns Object with pitch, roll, and yaw angles
  */
 function calculateOrientationFromAspectRatio(
   currentAspectRatio: number,
   expectedAspectRatio: number,
   angle: number,
-): { pitch: number; roll: number } {
+  coefficients: { pitch: number; roll: number } = { pitch: 1.0, roll: 1.0 },
+): { pitch: number; roll: number; yaw: number } {
   // Determine if the aspect ratio change is primarily due to pitch or roll rotation
   if (Math.abs(angle) < 5) {
     // Small YOLO angle - aspect ratio change likely due to pitch (forward/backward tilt)
     const ratioDiff =
       (currentAspectRatio - expectedAspectRatio) / expectedAspectRatio;
-    const pitch = calculatePitchFromRatio(ratioDiff);
-    return { pitch, roll: 0 };
+    const pitch = calculatePitchFromRatio(ratioDiff) * coefficients.pitch;
+    return { pitch, roll: 0, yaw: angle };
   }
 
   if (Math.abs(angle) > 85) {
     // Large YOLO angle - object is rotated ~90°, aspect ratio change indicates roll
     const ratioDiff =
       (currentAspectRatio - expectedAspectRatio) / expectedAspectRatio;
-    const roll = calculatePitchFromRatio(ratioDiff);
-    return { pitch: 0, roll };
+    const roll = calculatePitchFromRatio(ratioDiff) * coefficients.roll;
+    return { pitch: 0, roll, yaw: angle };
   }
 
   // Mixed case: linear interpolation between pitch and roll based on angle
@@ -73,10 +75,12 @@ function calculateOrientationFromAspectRatio(
   const totalRatioDiff =
     (currentAspectRatio - expectedAspectRatio) / expectedAspectRatio;
 
-  const pitch = calculatePitchFromRatio(totalRatioDiff * pitchWeight);
-  const roll = calculatePitchFromRatio(totalRatioDiff * rollWeight);
+  const pitch =
+    calculatePitchFromRatio(totalRatioDiff * pitchWeight) * coefficients.pitch;
+  const roll =
+    calculatePitchFromRatio(totalRatioDiff * rollWeight) * coefficients.roll;
 
-  return { pitch, roll };
+  return { pitch, roll, yaw: angle };
 }
 
 /**
@@ -86,12 +90,14 @@ function calculateOrientationFromAspectRatio(
  * @param imageWidth Image width in pixels
  * @param objectSize Real-world object size in meters
  * @param angle Bounding box rotation angle in degrees
+ * @param orientationCoefficients Optional multipliers for pitch/roll estimation
  */
 export function estimate3DInfo(
   boundingBox: [number, number, number, number],
   imageWidth: number,
   objectSize: { width: number; height: number },
   angle: number,
+  orientationCoefficients?: { pitch?: number; roll?: number },
 ) {
   const [, , width, height] = boundingBox;
 
@@ -136,7 +142,16 @@ export function estimate3DInfo(
 
   // No artificial depth constraints - let physics and detection limits apply naturally
 
-  const orientation = estimateOrientation(boundingBox, realSize, angle);
+  const coefficients = {
+    pitch: orientationCoefficients?.pitch ?? 1.0,
+    roll: orientationCoefficients?.roll ?? 1.0,
+  };
+  const orientation = estimateOrientation(
+    boundingBox,
+    realSize,
+    angle,
+    coefficients,
+  );
 
   return {
     depth,
@@ -145,17 +160,18 @@ export function estimate3DInfo(
 }
 
 /**
- * Estimate orientation (pitch and roll) from bounding box using aspect ratio analysis
+ * Estimate complete 3D orientation (pitch, roll, and yaw) from bounding box and angle
  */
 function estimateOrientation(
   boundingBox: [number, number, number, number],
   realSize: { width: number; height: number; aspectRatio: number },
   angle: number = 0,
-): { pitch: number; roll: number } {
+  coefficients: { pitch: number; roll: number } = { pitch: 1.0, roll: 1.0 },
+): { pitch: number; roll: number; yaw: number } {
   const [, , width, height] = boundingBox;
 
   if (width <= 0 || height <= 0) {
-    return { pitch: 0, roll: 0 };
+    return { pitch: 0, roll: 0, yaw: angle };
   }
 
   const currentAspectRatio = width / height;
@@ -165,6 +181,7 @@ function estimateOrientation(
     currentAspectRatio,
     expectedAspectRatio,
     angle,
+    coefficients,
   );
 }
 
@@ -175,12 +192,14 @@ export function add3DToDetection(
   detection: Detection,
   imageWidth: number,
   objectSize: { width: number; height: number },
+  orientationCoefficients?: { pitch?: number; roll?: number },
 ): ARDetection {
   const info = estimate3DInfo(
     detection.boundingBox,
     imageWidth,
     objectSize,
     detection.angle,
+    orientationCoefficients,
   );
 
   return {

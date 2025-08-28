@@ -18,10 +18,16 @@ import type {
 type TensorFlowBackend = "webgl" | "webgpu" | "wasm" | "cpu";
 
 // Constant definitions
-const DEFAULT_INFERENCE_INTERVAL_MS = 500;
+const DEFAULT_INFERENCE_INTERVAL_MS = 50;
 const DEFAULT_BACKEND: TensorFlowBackend = "webgl";
 const RESUME_DELAY_MS = 1000;
 const BYTES_TO_MB = 1024 * 1024;
+
+// Performance constants
+const PERFORMANCE_CONFIG = {
+  DEFAULT_SKIP_THRESHOLD_MS: 200,
+  DEFAULT_MAX_CONSECUTIVE_SKIPS: 5,
+} as const;
 
 /**
  * Object Detection Controller
@@ -44,7 +50,15 @@ export class DetectionController {
   private cameraManager: CameraManager | null = null; // Camera management instance
   private canvasManager: CanvasManager | null = null; // Canvas management instance
   private backend: TensorFlowBackend; // TensorFlow.js backend
-  private animationFrameId: number | null = null; // Animation frame ID
+  private detectionIntervalId: number | null = null; // Detection interval ID
+  private isDetectionRunning = false; // Flag to prevent overlapping detections
+
+  // Frame skipping for performance
+  private lastProcessingTime = 0; // Last processing duration
+  private skipFrameThreshold = PERFORMANCE_CONFIG.DEFAULT_SKIP_THRESHOLD_MS;
+  private consecutiveSkipCount = 0; // Number of consecutive skipped frames
+  private maxConsecutiveSkips =
+    PERFORMANCE_CONFIG.DEFAULT_MAX_CONSECUTIVE_SKIPS;
 
   // Performance optimization cache
   private cachedCropRegion?: ReturnType<typeof this.calculateCropRegion>; // Crop region cache
@@ -163,34 +177,59 @@ export class DetectionController {
 
   /**
    * Start real-time detection loop
-   * Uses requestAnimationFrame to continuously execute object detection
+   * Uses setInterval with non-blocking execution to prevent performance violations
    * Handles errors appropriately based on fatal/non-fatal classification
    */
   private startDetectionLoop(): void {
-    const detectionLoop = async () => {
-      const currentTime = Date.now();
-
-      // Check execution conditions (idle state and meets interval condition)
-      if (this.shouldExecuteDetection(currentTime)) {
-        this.detectionState = DetectionState.PROCESSING;
-        this.lastDetectionTimestamp = currentTime;
-
-        try {
-          await this.detectObjects();
-        } catch (error) {
-          this.handleDetectionError(error);
-        } finally {
-          if (this.detectionState === DetectionState.PROCESSING) {
-            this.detectionState = DetectionState.IDLE;
-          }
+    const scheduleNextDetection = () => {
+      this.detectionIntervalId = setTimeout(() => {
+        // Quick skip check in timeout handler to avoid heavy processing
+        if (this.shouldSkipFrame()) {
+          this.handleFrameSkip();
+          this.scheduleNextIfActive(scheduleNextDetection);
+          return;
         }
-      }
 
-      // Re-execute on next frame
-      this.animationFrameId = requestAnimationFrame(detectionLoop);
+        // Execute detection asynchronously only if not skipping
+        setTimeout(() => {
+          this.executeDetectionCycle().finally(() => {
+            this.scheduleNextIfActive(scheduleNextDetection);
+          });
+        }, 0);
+      }, this.detectionIntervalMs);
     };
 
-    detectionLoop();
+    scheduleNextDetection();
+  }
+
+  /**
+   * Execute single detection cycle
+   */
+  private async executeDetectionCycle(): Promise<void> {
+    const currentTime = Date.now();
+
+    // Check execution conditions and prevent overlapping detections
+    if (!this.shouldExecuteDetection(currentTime) || this.isDetectionRunning) {
+      return;
+    }
+
+    this.isDetectionRunning = true;
+    this.detectionState = DetectionState.PROCESSING;
+    this.lastDetectionTimestamp = currentTime;
+
+    const startTime = Date.now();
+    try {
+      await this.detectObjects();
+      this.consecutiveSkipCount = 0; // Reset skip count on successful processing
+    } catch (error) {
+      this.handleDetectionError(error);
+    } finally {
+      this.lastProcessingTime = Date.now() - startTime;
+      this.isDetectionRunning = false;
+      if (this.detectionState === DetectionState.PROCESSING) {
+        this.detectionState = DetectionState.IDLE;
+      }
+    }
   }
 
   /**
@@ -260,6 +299,7 @@ export class DetectionController {
           result,
           this.canvas.width,
           this.threeDOptions.objectSize,
+          this.threeDOptions.orientationCoefficients,
         ) as ARDetection;
       }
 
@@ -284,13 +324,41 @@ export class DetectionController {
   }
 
   /**
+   * Determine whether to skip the current frame for performance
+   * @returns Whether to skip this frame
+   */
+  private shouldSkipFrame(): boolean {
+    // Don't skip if we haven't processed any frames yet
+    if (this.lastProcessingTime === 0) {
+      return false;
+    }
+
+    // Don't skip if we've already skipped too many consecutive frames
+    if (this.consecutiveSkipCount >= this.maxConsecutiveSkips) {
+      return false;
+    }
+
+    // Skip if last processing took too long
+    return this.lastProcessingTime > this.skipFrameThreshold;
+  }
+
+  /**
    * Pause detection processing
-   * Detection loop continues but skips actual inference processing
+   * Stops detection interval and optionally pauses camera
    * @param options Pause options. If pauseCamera is false, only pauses detection (camera continues).
    */
   public pause(
     options: { pauseCamera?: boolean } = { pauseCamera: true },
   ): void {
+    // Clear detection interval to stop processing
+    if (this.detectionIntervalId !== null) {
+      clearTimeout(this.detectionIntervalId);
+      this.detectionIntervalId = null;
+    }
+
+    // Reset detection flag to prevent stuck states
+    this.isDetectionRunning = false;
+
     if (options.pauseCamera) {
       this.detectionState = DetectionState.PAUSED;
       this.video.pause();
@@ -301,22 +369,40 @@ export class DetectionController {
 
   /**
    * Resume detection processing
-   * Resumes detection processing after a 1 second delay
+   * Restarts detection interval and resumes camera if needed
    */
   public async resume(): Promise<void> {
-    const resetToIdleState = () => {
+    const restartDetection = () => {
       this.lastDetectionTimestamp = 0;
       this.detectionState = DetectionState.IDLE;
+      // Restart detection interval
+      this.startDetectionLoop();
     };
 
     if (this.video.paused) {
       try {
         await this.video.play();
       } finally {
-        setTimeout(resetToIdleState, RESUME_DELAY_MS);
+        setTimeout(restartDetection, RESUME_DELAY_MS);
       }
     } else {
-      setTimeout(resetToIdleState, RESUME_DELAY_MS);
+      setTimeout(restartDetection, RESUME_DELAY_MS);
+    }
+  }
+
+  /**
+   * Handle frame skipping logic
+   */
+  private handleFrameSkip(): void {
+    this.consecutiveSkipCount++;
+  }
+
+  /**
+   * Schedule next detection if still active
+   */
+  private scheduleNextIfActive(scheduleNext: () => void): void {
+    if (this.detectionIntervalId !== null) {
+      scheduleNext();
     }
   }
 
@@ -512,11 +598,14 @@ export class DetectionController {
   public dispose(): void {
     this.detectionState = DetectionState.PAUSED;
 
-    // Cancel animation frame
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
+    // Clear detection interval
+    if (this.detectionIntervalId !== null) {
+      clearTimeout(this.detectionIntervalId);
+      this.detectionIntervalId = null;
     }
+
+    // Reset detection flag
+    this.isDetectionRunning = false;
 
     // Dispose camera
     if (this.cameraManager) {

@@ -280,6 +280,7 @@ export function processTopLevelGroup(
   const rotation = new THREE.Vector3(0, 0, 0);
   if (detection.orientation) {
     rotation.x = convertDegreesToRadians(detection.orientation.pitch);
+    rotation.y = convertDegreesToRadians(detection.orientation.yaw);
     rotation.z = convertDegreesToRadians(detection.orientation.roll);
   }
 
@@ -387,6 +388,7 @@ export function calculateARTransform(
   const rotation = new THREE.Vector3(0, 0, 0);
   if (detection.orientation) {
     rotation.x = convertDegreesToRadians(detection.orientation.pitch);
+    rotation.y = convertDegreesToRadians(detection.orientation.yaw);
     rotation.z = convertDegreesToRadians(detection.orientation.roll);
   }
 
