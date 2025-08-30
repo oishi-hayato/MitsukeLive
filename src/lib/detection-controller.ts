@@ -23,12 +23,6 @@ const DEFAULT_BACKEND: TensorFlowBackend = "webgl";
 const RESUME_DELAY_MS = 1000;
 const BYTES_TO_MB = 1024 * 1024;
 
-// Performance constants
-const PERFORMANCE_CONFIG = {
-  DEFAULT_SKIP_THRESHOLD_MS: 200,
-  DEFAULT_MAX_CONSECUTIVE_SKIPS: 5,
-} as const;
-
 /**
  * Object Detection Controller
  * Integrates camera, canvas, and YOLO inference management and runs real-time detection loops
@@ -53,12 +47,11 @@ export class DetectionController {
   private detectionIntervalId: number | null = null; // Detection interval ID
   private isDetectionRunning = false; // Flag to prevent overlapping detections
 
-  // Frame skipping for performance
-  private lastProcessingTime = 0; // Last processing duration
-  private skipFrameThreshold = PERFORMANCE_CONFIG.DEFAULT_SKIP_THRESHOLD_MS;
-  private consecutiveSkipCount = 0; // Number of consecutive skipped frames
-  private maxConsecutiveSkips =
-    PERFORMANCE_CONFIG.DEFAULT_MAX_CONSECUTIVE_SKIPS;
+  // Single slot control for 1 frame = 1 detection max
+  private inFlight = false; // Detection processing in worker
+  private hasResult = false; // Unprocessed result available
+  private latestResult: Detection | null = null; // Latest detection result (single slot)
+  private rafId: number | null = null; // RequestAnimationFrame ID
 
   // Performance optimization cache
   private cachedCropRegion?: ReturnType<typeof this.calculateCropRegion>; // Crop region cache
@@ -176,30 +169,67 @@ export class DetectionController {
   }
 
   /**
-   * Start real-time detection loop
-   * Uses setInterval with non-blocking execution to prevent performance violations
-   * Handles errors appropriately based on fatal/non-fatal classification
+   * Start real-time detection loop using RAF with single slot control
+   * 1 frame = max 1 detection result applied
    */
   private startDetectionLoop(): void {
-    const scheduleNextDetection = () => {
-      this.detectionIntervalId = setTimeout(() => {
-        // Quick skip check in timeout handler to avoid heavy processing
-        if (this.shouldSkipFrame()) {
-          this.handleFrameSkip();
-          this.scheduleNextIfActive(scheduleNextDetection);
-          return;
+    // Initialize detection scheduling flag
+    this.detectionIntervalId = 1; // Set non-null to enable scheduling
+
+    // Start RAF loop for result application
+    this.startRAFLoop();
+
+    // Schedule detection requests
+    this.scheduleDetection();
+  }
+
+  /**
+   * Single RAF loop for result application (1 per frame max)
+   */
+  private startRAFLoop(): void {
+    const rafTick = () => {
+      // Apply result if available (single slot)
+      if (this.hasResult) {
+        this.onDetection(this.latestResult); // Can be null
+        this.hasResult = false;
+        this.latestResult = null;
+      }
+
+      // Continue RAF loop
+      if (this.rafId !== null) {
+        this.rafId = requestAnimationFrame(rafTick);
+      }
+    };
+
+    this.rafId = requestAnimationFrame(rafTick);
+  }
+
+  /**
+   * Schedule detection execution (non-blocking)
+   */
+  private scheduleDetection(): void {
+    const schedule = () => {
+      setTimeout(() => {
+        // Only start new detection if not in flight
+        if (!this.inFlight) {
+          this.inFlight = true;
+
+          // Execute detection without blocking
+          setTimeout(() => {
+            this.executeDetectionCycle().finally(() => {
+              this.inFlight = false;
+            });
+          }, 0);
         }
 
-        // Execute detection asynchronously only if not skipping
-        setTimeout(() => {
-          this.executeDetectionCycle().finally(() => {
-            this.scheduleNextIfActive(scheduleNextDetection);
-          });
-        }, 0);
+        // Continue scheduling
+        if (this.detectionIntervalId !== null) {
+          schedule();
+        }
       }, this.detectionIntervalMs);
     };
 
-    scheduleNextDetection();
+    schedule();
   }
 
   /**
@@ -217,14 +247,11 @@ export class DetectionController {
     this.detectionState = DetectionState.PROCESSING;
     this.lastDetectionTimestamp = currentTime;
 
-    const startTime = Date.now();
     try {
       await this.detectObjects();
-      this.consecutiveSkipCount = 0; // Reset skip count on successful processing
     } catch (error) {
       this.handleDetectionError(error);
     } finally {
-      this.lastProcessingTime = Date.now() - startTime;
       this.isDetectionRunning = false;
       if (this.detectionState === DetectionState.PROCESSING) {
         this.detectionState = DetectionState.IDLE;
@@ -284,7 +311,7 @@ export class DetectionController {
   }
 
   /**
-   * Handle detection results
+   * Handle detection results (single slot storage)
    * @param detectionResults Detection results array
    */
   private handleDetectionResults(
@@ -303,11 +330,13 @@ export class DetectionController {
         ) as ARDetection;
       }
 
-      // Notify highest score detection result
-      this.onDetection(result);
+      // Store in single slot (overwrites previous if exists)
+      this.latestResult = result;
+      this.hasResult = true;
     } else {
-      // Notify when no detection was made
-      this.onDetection(null);
+      // Store null result
+      this.latestResult = null;
+      this.hasResult = true;
     }
   }
 
@@ -324,27 +353,8 @@ export class DetectionController {
   }
 
   /**
-   * Determine whether to skip the current frame for performance
-   * @returns Whether to skip this frame
-   */
-  private shouldSkipFrame(): boolean {
-    // Don't skip if we haven't processed any frames yet
-    if (this.lastProcessingTime === 0) {
-      return false;
-    }
-
-    // Don't skip if we've already skipped too many consecutive frames
-    if (this.consecutiveSkipCount >= this.maxConsecutiveSkips) {
-      return false;
-    }
-
-    // Skip if last processing took too long
-    return this.lastProcessingTime > this.skipFrameThreshold;
-  }
-
-  /**
    * Pause detection processing
-   * Stops detection interval and optionally pauses camera
+   * Stops detection interval and RAF loop, optionally pauses camera
    * @param options Pause options. If pauseCamera is false, only pauses detection (camera continues).
    */
   public pause(
@@ -356,8 +366,17 @@ export class DetectionController {
       this.detectionIntervalId = null;
     }
 
-    // Reset detection flag to prevent stuck states
+    // Stop RAF loop
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+
+    // Reset detection flags and clear results
     this.isDetectionRunning = false;
+    this.inFlight = false;
+    this.hasResult = false;
+    this.latestResult = null;
 
     if (options.pauseCamera) {
       this.detectionState = DetectionState.PAUSED;
@@ -387,22 +406,6 @@ export class DetectionController {
       }
     } else {
       setTimeout(restartDetection, RESUME_DELAY_MS);
-    }
-  }
-
-  /**
-   * Handle frame skipping logic
-   */
-  private handleFrameSkip(): void {
-    this.consecutiveSkipCount++;
-  }
-
-  /**
-   * Schedule next detection if still active
-   */
-  private scheduleNextIfActive(scheduleNext: () => void): void {
-    if (this.detectionIntervalId !== null) {
-      scheduleNext();
     }
   }
 
@@ -604,8 +607,17 @@ export class DetectionController {
       this.detectionIntervalId = null;
     }
 
-    // Reset detection flag
+    // Stop RAF loop
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+
+    // Reset detection flags and clear results
     this.isDetectionRunning = false;
+    this.inFlight = false;
+    this.hasResult = false;
+    this.latestResult = null;
 
     // Dispose camera
     if (this.cameraManager) {
