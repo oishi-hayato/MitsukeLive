@@ -18,7 +18,7 @@ import type {
 type TensorFlowBackend = "webgl" | "webgpu" | "wasm" | "cpu";
 
 // Constant definitions
-const DEFAULT_INFERENCE_INTERVAL_MS = 50;
+const DEFAULT_INFERENCE_INTERVAL_MS = 150; // ~6.7fps - balance for hand shake tolerance and performance
 const DEFAULT_BACKEND: TensorFlowBackend = "webgl";
 const RESUME_DELAY_MS = 1000;
 const BYTES_TO_MB = 1024 * 1024;
@@ -47,11 +47,6 @@ export class DetectionController {
   private detectionIntervalId: number | null = null; // Detection interval ID
   private isDetectionRunning = false; // Flag to prevent overlapping detections
 
-  // Single slot control for 1 frame = 1 detection max
-  private inFlight = false; // Detection processing in worker
-  private hasResult = false; // Unprocessed result available
-  private latestResult: Detection | null = null; // Latest detection result (single slot)
-  private rafId: number | null = null; // RequestAnimationFrame ID
 
   // Performance optimization cache
   private cachedCropRegion?: ReturnType<typeof this.calculateCropRegion>; // Crop region cache
@@ -169,58 +164,22 @@ export class DetectionController {
   }
 
   /**
-   * Start real-time detection loop using RAF with single slot control
-   * 1 frame = max 1 detection result applied
+   * Start real-time detection loop with single slot control
    */
   private startDetectionLoop(): void {
-    // Initialize detection scheduling flag
-    this.detectionIntervalId = 1; // Set non-null to enable scheduling
-
-    // Start RAF loop for result application
-    this.startRAFLoop();
-
-    // Schedule detection requests
     this.scheduleDetection();
   }
 
   /**
-   * Single RAF loop for result application (1 per frame max)
-   */
-  private startRAFLoop(): void {
-    const rafTick = () => {
-      // Apply result if available (single slot)
-      if (this.hasResult) {
-        this.onDetection(this.latestResult); // Can be null
-        this.hasResult = false;
-        this.latestResult = null;
-      }
-
-      // Continue RAF loop
-      if (this.rafId !== null) {
-        this.rafId = requestAnimationFrame(rafTick);
-      }
-    };
-
-    this.rafId = requestAnimationFrame(rafTick);
-  }
-
-  /**
-   * Schedule detection execution (non-blocking)
+   * Schedule detection execution with single slot control
    */
   private scheduleDetection(): void {
     const schedule = () => {
-      setTimeout(() => {
-        // Only start new detection if not in flight
-        if (!this.inFlight) {
-          this.inFlight = true;
-
-          // Execute detection without blocking
-          setTimeout(() => {
-            this.executeDetectionCycle().finally(() => {
-              this.inFlight = false;
-            });
-          }, 0);
-        }
+      this.detectionIntervalId = setTimeout(() => {
+        // Execute detection asynchronously
+        setTimeout(() => {
+          this.executeDetectionCycle();
+        }, 0);
 
         // Continue scheduling
         if (this.detectionIntervalId !== null) {
@@ -311,7 +270,7 @@ export class DetectionController {
   }
 
   /**
-   * Handle detection results (single slot storage)
+   * Handle detection results
    * @param detectionResults Detection results array
    */
   private handleDetectionResults(
@@ -330,13 +289,11 @@ export class DetectionController {
         ) as ARDetection;
       }
 
-      // Store in single slot (overwrites previous if exists)
-      this.latestResult = result;
-      this.hasResult = true;
+      // Call detection callback immediately
+      this.onDetection(result);
     } else {
-      // Store null result
-      this.latestResult = null;
-      this.hasResult = true;
+      // Call detection callback with null
+      this.onDetection(null);
     }
   }
 
@@ -366,17 +323,8 @@ export class DetectionController {
       this.detectionIntervalId = null;
     }
 
-    // Stop RAF loop
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
-    }
-
-    // Reset detection flags and clear results
+    // Reset detection flags
     this.isDetectionRunning = false;
-    this.inFlight = false;
-    this.hasResult = false;
-    this.latestResult = null;
 
     if (options.pauseCamera) {
       this.detectionState = DetectionState.PAUSED;
@@ -607,17 +555,8 @@ export class DetectionController {
       this.detectionIntervalId = null;
     }
 
-    // Stop RAF loop
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
-    }
-
-    // Reset detection flags and clear results
+    // Reset detection flags
     this.isDetectionRunning = false;
-    this.inFlight = false;
-    this.hasResult = false;
-    this.latestResult = null;
 
     // Dispose camera
     if (this.cameraManager) {
