@@ -1,5 +1,3 @@
-/// <reference lib="webworker" />
-
 import { WorkerQueueManager } from "./worker-queue-manager";
 
 // Initialize queue manager
