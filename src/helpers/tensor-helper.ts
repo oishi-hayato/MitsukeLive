@@ -1,4 +1,5 @@
 import * as tf from "@tensorflow/tfjs";
+import { MLInternalError } from "../errors";
 
 /**
  * Generate normalized tensor from video element
@@ -6,7 +7,23 @@ import * as tf from "@tensorflow/tfjs";
  * @returns RGB tf.Tensor3D normalized to 0-1
  */
 function getNormalizedVideoTensor(videoElement: HTMLVideoElement): tf.Tensor3D {
-  return tf.browser.fromPixels(videoElement).toFloat().div(tf.scalar(255.0));
+  if (
+    !videoElement ||
+    videoElement.videoWidth === 0 ||
+    videoElement.videoHeight === 0
+  ) {
+    throw new MLInternalError("VIDEO_NOT_READY_FOR_TENSOR_CONVERSION", true);
+  }
+
+  try {
+    return tf.browser.fromPixels(videoElement).toFloat().div(tf.scalar(255.0));
+  } catch (error) {
+    throw new MLInternalError(
+      "FAILED_TO_CREATE_VIDEO_TENSOR",
+      true,
+      error as Error,
+    );
+  }
 }
 
 /**
@@ -25,10 +42,31 @@ export function cropNormalizedVideoTensor(
   width: number,
   height: number,
 ): tf.Tensor3D {
+  // Validate parameters
+  if (
+    !Number.isFinite(cropX) ||
+    !Number.isFinite(cropY) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    cropX < 0 ||
+    cropY < 0 ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    throw new MLInternalError("INVALID_CROP_PARAMETERS", true);
+  }
+
   const fullImage = getNormalizedVideoTensor(videoElement);
 
-  return fullImage.slice(
-    [Math.floor(cropY), Math.floor(cropX), 0],
-    [Math.floor(height), Math.floor(width), 3],
-  );
+  try {
+    const croppedTensor = fullImage.slice(
+      [Math.floor(cropY), Math.floor(cropX), 0],
+      [Math.floor(height), Math.floor(width), 3],
+    );
+    fullImage.dispose();
+    return croppedTensor;
+  } catch (error) {
+    fullImage.dispose();
+    throw new MLInternalError("TENSOR_CROP_FAILED", true, error as Error);
+  }
 }

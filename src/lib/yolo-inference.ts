@@ -1,13 +1,13 @@
 import * as tf from "@tensorflow/tfjs";
 import { load } from "js-yaml";
 import { MLInternalError } from "../errors";
+import { findValidDetections, transformToCanvas } from "../helpers/yolo-helper";
 import type {
   Detection,
-  YOLOInferenceOptions,
   LetterboxInfo,
+  YOLOInferenceOptions,
   YOLOMetadata,
 } from "../types";
-import { transformToCanvas, findValidDetections } from "../helpers/yolo-helper";
 
 /**
  * YOLO Inference Instance
@@ -105,10 +105,17 @@ export class YOLOInference {
   private async loadMetadata(): Promise<void> {
     try {
       const response = await fetch(this.options.metadataPath);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const text = await response.text();
       this.metadata = load(text) as YOLOMetadata;
     } catch (error: unknown) {
-      throw new MLInternalError("FAILED_TO_LOAD_METADATA");
+      throw new MLInternalError(
+        "FAILED_TO_LOAD_METADATA",
+        true,
+        error as Error,
+      );
     }
   }
 
@@ -119,7 +126,7 @@ export class YOLOInference {
     try {
       this.model = await tf.loadGraphModel(this.options.modelPath);
     } catch (error: unknown) {
-      throw new MLInternalError("FAILED_TO_LOAD_MODEL");
+      throw new MLInternalError("FAILED_TO_LOAD_MODEL", true, error as Error);
     }
   }
 

@@ -30,7 +30,7 @@ export interface ARDetection extends Detection {
 export interface ObjectDetectorOptions {
   /** Detection settings */
   detection?: {
-    /** Inference execution interval (milliseconds). Default: 500ms */
+    /** Inference execution interval (milliseconds). Default: 150ms */
     inferenceInterval?: number;
     /** Minimum confidence score for detection. Default: 0.7 */
     scoreThreshold?: number;

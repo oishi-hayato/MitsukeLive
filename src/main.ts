@@ -9,9 +9,9 @@ export type { MLClientError } from "./errors";
 export type { DetectionController } from "./lib/detection-controller";
 export * from "./client-helpers";
 
+import { MLClientError } from "./errors";
 import { DetectionController } from "./lib/detection-controller";
 import type { ObjectDetectorOptions } from "./types";
-import { MLClientError } from "./errors";
 
 /**
  * Main function

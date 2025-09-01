@@ -1,5 +1,5 @@
 import { MLInternalError } from "../errors";
-import type { Detection, ARDetection } from "../types";
+import type { ARDetection, Detection } from "../types";
 
 // Constants
 const CONSISTENCY_EPS = 0.25; // 25% tolerance for width/height-based depth agreement

@@ -1,33 +1,27 @@
 import * as tf from "@tensorflow/tfjs";
-import { CameraManager } from "./camera-manager";
-import { CanvasManager } from "./canvas-manager";
-import { YOLOInference } from "./yolo-inference";
 import { MLInternalError } from "../errors";
-import { CONSOLE_MESSAGES } from "../errors/error-messages";
+import { add3DToDetection } from "../helpers/3d-helper";
 import { cropNormalizedVideoTensor } from "../helpers/tensor-helper";
 import { letterboxTransform } from "../helpers/yolo-helper";
-import { add3DToDetection } from "../helpers/3d-helper";
 import type {
-  ObjectDetectorOptions,
-  Detection,
   ARDetection,
+  Detection,
   LetterboxInfo,
+  ObjectDetectorOptions,
 } from "../types";
+import { CameraManager } from "./camera-manager";
+import { CanvasManager } from "./canvas-manager";
+import { WorkerQueueController } from "./worker-queue-controller";
+import { YOLOInference } from "./yolo-inference";
 
 // Type definitions
 type TensorFlowBackend = "webgl" | "webgpu" | "wasm" | "cpu";
 
 // Constant definitions
-const DEFAULT_INFERENCE_INTERVAL_MS = 50;
+const DEFAULT_INFERENCE_INTERVAL_MS = 150; // ~6.7fps - balance for hand shake tolerance and performance
 const DEFAULT_BACKEND: TensorFlowBackend = "webgl";
 const RESUME_DELAY_MS = 1000;
 const BYTES_TO_MB = 1024 * 1024;
-
-// Performance constants
-const PERFORMANCE_CONFIG = {
-  DEFAULT_SKIP_THRESHOLD_MS: 200,
-  DEFAULT_MAX_CONSECUTIVE_SKIPS: 5,
-} as const;
 
 /**
  * Object Detection Controller
@@ -52,13 +46,7 @@ export class DetectionController {
   private backend: TensorFlowBackend; // TensorFlow.js backend
   private detectionIntervalId: number | null = null; // Detection interval ID
   private isDetectionRunning = false; // Flag to prevent overlapping detections
-
-  // Frame skipping for performance
-  private lastProcessingTime = 0; // Last processing duration
-  private skipFrameThreshold = PERFORMANCE_CONFIG.DEFAULT_SKIP_THRESHOLD_MS;
-  private consecutiveSkipCount = 0; // Number of consecutive skipped frames
-  private maxConsecutiveSkips =
-    PERFORMANCE_CONFIG.DEFAULT_MAX_CONSECUTIVE_SKIPS;
+  private workerQueueController: WorkerQueueController | null = null; // Worker queue controller with fallback
 
   // Performance optimization cache
   private cachedCropRegion?: ReturnType<typeof this.calculateCropRegion>; // Crop region cache
@@ -104,6 +92,12 @@ export class DetectionController {
     // 3D estimation configuration
     this.enable3D = !!options.threeDEstimation;
     this.threeDOptions = options.threeDEstimation;
+
+    // Initialize Worker queue controller with fallback
+    this.workerQueueController = new WorkerQueueController(
+      this.onDetection,
+      this.detectionIntervalMs,
+    );
   }
 
   /**
@@ -128,11 +122,16 @@ export class DetectionController {
         this.onCameraNotAllowed();
         return;
       }
-      throw error;
+      // Wrap unknown errors in MLInternalError
+      throw new MLInternalError("CAMERA_SETUP_FAILED");
     }
 
     this.setupCanvas(canvasElementId);
+    // Start detection loop and queue processor
     this.startDetectionLoop();
+
+    // Start Worker queue processing
+    this.workerQueueController?.start();
   }
 
   private async setupCamera(videoElementId: string): Promise<void> {
@@ -176,30 +175,31 @@ export class DetectionController {
   }
 
   /**
-   * Start real-time detection loop
-   * Uses setInterval with non-blocking execution to prevent performance violations
-   * Handles errors appropriately based on fatal/non-fatal classification
+   * Start real-time detection loop with single slot control
    */
   private startDetectionLoop(): void {
-    const scheduleNextDetection = () => {
-      this.detectionIntervalId = setTimeout(() => {
-        // Quick skip check in timeout handler to avoid heavy processing
-        if (this.shouldSkipFrame()) {
-          this.handleFrameSkip();
-          this.scheduleNextIfActive(scheduleNextDetection);
-          return;
-        }
+    this.scheduleDetection();
+  }
 
-        // Execute detection asynchronously only if not skipping
+  /**
+   * Schedule detection execution with single slot control
+   */
+  private scheduleDetection(): void {
+    const schedule = () => {
+      this.detectionIntervalId = setTimeout(() => {
+        // Execute detection asynchronously
         setTimeout(() => {
-          this.executeDetectionCycle().finally(() => {
-            this.scheduleNextIfActive(scheduleNextDetection);
-          });
+          this.executeDetectionCycle();
         }, 0);
+
+        // Continue scheduling
+        if (this.detectionIntervalId !== null) {
+          schedule();
+        }
       }, this.detectionIntervalMs);
     };
 
-    scheduleNextDetection();
+    schedule();
   }
 
   /**
@@ -217,14 +217,11 @@ export class DetectionController {
     this.detectionState = DetectionState.PROCESSING;
     this.lastDetectionTimestamp = currentTime;
 
-    const startTime = Date.now();
     try {
       await this.detectObjects();
-      this.consecutiveSkipCount = 0; // Reset skip count on successful processing
     } catch (error) {
       this.handleDetectionError(error);
     } finally {
-      this.lastProcessingTime = Date.now() - startTime;
       this.isDetectionRunning = false;
       if (this.detectionState === DetectionState.PROCESSING) {
         this.detectionState = DetectionState.IDLE;
@@ -240,7 +237,13 @@ export class DetectionController {
     if (error instanceof MLInternalError) {
       this.handleMLError(error);
     } else {
-      this.handleUnexpectedError(error);
+      // Wrap unexpected errors in MLInternalError
+      const wrappedError = new MLInternalError(
+        "UNEXPECTED_DETECTION_ERROR",
+        true,
+        error as Error,
+      );
+      this.handleMLError(wrappedError);
     }
   }
 
@@ -251,8 +254,6 @@ export class DetectionController {
   private handleMLError(error: MLInternalError): void {
     if (error.fatal) {
       this.handleFatalError(error);
-    } else {
-      this.handleNonFatalError(error);
     }
   }
 
@@ -261,26 +262,8 @@ export class DetectionController {
    * @param error Fatal error
    */
   private handleFatalError(error: MLInternalError): void {
-    console.error(CONSOLE_MESSAGES.FATAL_ERROR, error);
     this.pause();
     throw error;
-  }
-
-  /**
-   * Handle non-fatal errors
-   * @param error Non-fatal error
-   */
-  private handleNonFatalError(error: MLInternalError): void {
-    console.warn(CONSOLE_MESSAGES.NON_FATAL_ERROR, error);
-  }
-
-  /**
-   * Handle unexpected errors
-   * @param error Unexpected error
-   */
-  private handleUnexpectedError(error: unknown): void {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(CONSOLE_MESSAGES.UNEXPECTED_ERROR, errorMessage, error);
   }
 
   /**
@@ -303,11 +286,9 @@ export class DetectionController {
         ) as ARDetection;
       }
 
-      // Notify highest score detection result
-      this.onDetection(result);
+      this.workerQueueController?.enqueueResult(result as ARDetection);
     } else {
-      // Notify when no detection was made
-      this.onDetection(null);
+      this.workerQueueController?.enqueueResult(null);
     }
   }
 
@@ -324,27 +305,8 @@ export class DetectionController {
   }
 
   /**
-   * Determine whether to skip the current frame for performance
-   * @returns Whether to skip this frame
-   */
-  private shouldSkipFrame(): boolean {
-    // Don't skip if we haven't processed any frames yet
-    if (this.lastProcessingTime === 0) {
-      return false;
-    }
-
-    // Don't skip if we've already skipped too many consecutive frames
-    if (this.consecutiveSkipCount >= this.maxConsecutiveSkips) {
-      return false;
-    }
-
-    // Skip if last processing took too long
-    return this.lastProcessingTime > this.skipFrameThreshold;
-  }
-
-  /**
    * Pause detection processing
-   * Stops detection interval and optionally pauses camera
+   * Stops detection interval and RAF loop, optionally pauses camera
    * @param options Pause options. If pauseCamera is false, only pauses detection (camera continues).
    */
   public pause(
@@ -356,7 +318,10 @@ export class DetectionController {
       this.detectionIntervalId = null;
     }
 
-    // Reset detection flag to prevent stuck states
+    // Stop detection worker and queue processor
+    this.workerQueueController?.stop();
+
+    // Reset detection flags
     this.isDetectionRunning = false;
 
     if (options.pauseCamera) {
@@ -377,6 +342,8 @@ export class DetectionController {
       this.detectionState = DetectionState.IDLE;
       // Restart detection interval
       this.startDetectionLoop();
+      // Restart detection worker and queue processor
+      this.workerQueueController?.start();
     };
 
     if (this.video.paused) {
@@ -387,22 +354,6 @@ export class DetectionController {
       }
     } else {
       setTimeout(restartDetection, RESUME_DELAY_MS);
-    }
-  }
-
-  /**
-   * Handle frame skipping logic
-   */
-  private handleFrameSkip(): void {
-    this.consecutiveSkipCount++;
-  }
-
-  /**
-   * Schedule next detection if still active
-   */
-  private scheduleNextIfActive(scheduleNext: () => void): void {
-    if (this.detectionIntervalId !== null) {
-      scheduleNext();
     }
   }
 
@@ -595,6 +546,7 @@ export class DetectionController {
    * Release all resources and clean up memory
    * Properly dispose of camera, canvas, and inference instances
    */
+
   public dispose(): void {
     this.detectionState = DetectionState.PAUSED;
 
@@ -604,7 +556,11 @@ export class DetectionController {
       this.detectionIntervalId = null;
     }
 
-    // Reset detection flag
+    // Dispose detection worker and queue processor
+    this.workerQueueController?.dispose();
+    this.workerQueueController = null;
+
+    // Reset detection flags
     this.isDetectionRunning = false;
 
     // Dispose camera
@@ -641,7 +597,15 @@ export class DetectionController {
    * Sets up specified backend (webgl/webgpu/cpu, etc.)
    */
   private async setupBackend(): Promise<void> {
-    await tf.setBackend(this.backend);
-    await tf.ready();
+    try {
+      await tf.setBackend(this.backend);
+      await tf.ready();
+    } catch (error) {
+      throw new MLInternalError(
+        "TENSORFLOW_BACKEND_SETUP_FAILED",
+        true,
+        error as Error,
+      );
+    }
   }
 }
