@@ -1,6 +1,6 @@
 import type * as tf from "@tensorflow/tfjs";
-import type { LetterboxInfo, Detection } from "../types";
 import { MLInternalError } from "../errors";
+import type { Detection, LetterboxInfo } from "../types";
 import { convertRadiansToDegrees } from "./math-helper";
 
 // Type aliases

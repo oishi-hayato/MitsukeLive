@@ -2,16 +2,38 @@
   <img src="https://raw.githubusercontent.com/oishi-hayato/MitsukeLive/refs/heads/main/assets/LOGO.png" alt="MitsukeLive Logo" width="300">
 </p>
 
-# MitsukeLive
+# Mitsuke Live
 
-MitsukeLive is a browser-based real-time object detection library using TensorFlow.js and YOLO models, with flexible post-detection customization.
+Mitsuke Live is a browser-based real-time object detection library using TensorFlow.js and YOLO models, with flexible post-detection customization.
 
-MitsukeLive provides two detection modes:
+Mitsuke Live provides two detection modes:
 
 | Mode      | Features                                                                                        |
 | --------- | ----------------------------------------------------------------------------------------------- |
 | **2D**    | Basic object detection with 2D center coordinates                                               |
 | **3D/AR** | Object detection with 3D position and orientation, integrated with Three.js for AR applications |
+
+## Installation
+
+```bash
+npm install mitsuke-live
+```
+
+### Vite Configuration (Required)
+
+If you're using Vite, add this configuration to your `vite.config.ts` to ensure proper Web Worker handling:
+
+```typescript
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ["mitsuke-live"],
+  },
+});
+```
+
+**Important**: Without this configuration, Web Workers may not function correctly and you might encounter HTML response errors.
 
 ## Example
 
@@ -30,18 +52,20 @@ Access http://localhost:3000 in your browser to view two demos:
 
 ### ObjectDetectorOptions
 
-| Parameter                            | Type       | Default   | Description                                                          |
-| ------------------------------------ | ---------- | --------- | -------------------------------------------------------------------- |
-| `detection.inferenceInterval`        | `number`   | `500`     | Inference execution interval (milliseconds)                          |
-| `detection.scoreThreshold`           | `number`   | `0.7`     | Minimum confidence score for detection (0.0-1.0)                     |
-| `threeDEstimation.objectSize.width`  | `number`   | -         | Real object width in meters (required for 3D mode)                   |
-| `threeDEstimation.objectSize.height` | `number`   | -         | Real object height in meters (required for 3D mode)                  |
-| `threeDEstimation.cameraFov`         | `number`   | `50`      | Camera field of view in degrees                                      |
-| `performance.backend`                | `string`   | `"webgl"` | TensorFlow.js backend (`"webgl"`, `"webgpu"`, `"wasm"`, `"cpu"`)     |
-| `performance.memoryThreshold`        | `number`   | `50`      | Tensor count threshold for memory cleanup                            |
-| `onDetection`                        | `function` | -         | Callback for detection results (not called when detection is paused) |
-| `onCameraReady`                      | `function` | -         | Callback when camera is ready                                        |
-| `onCameraNotAllowed`                 | `function` | -         | Callback when camera access is denied                                |
+| Parameter                                              | Type       | Default   | Description                                                          |
+| ------------------------------------------------------ | ---------- | --------- | -------------------------------------------------------------------- |
+| `detection.inferenceInterval`                          | `number`   | `150`     | Inference execution interval (milliseconds)                          |
+| `detection.scoreThreshold`                             | `number`   | `0.7`     | Minimum confidence score for detection (0.0-1.0)                     |
+| `threeDEstimation.objectSize.width`                    | `number`   | -         | Real object width in meters (required for 3D mode)                   |
+| `threeDEstimation.objectSize.height`                   | `number`   | -         | Real object height in meters (required for 3D mode)                  |
+| `threeDEstimation.cameraFov`                           | `number`   | `50`      | Camera field of view in degrees                                      |
+| `threeDEstimation.orientationCoefficients.pitch`      | `number`   | `1.0`     | Multiplier for pitch estimation (up-down tilt)                       |
+| `threeDEstimation.orientationCoefficients.roll`       | `number`   | `1.0`     | Multiplier for roll estimation (left-right tilt)                     |
+| `performance.backend`                                  | `string`   | `"webgl"` | TensorFlow.js backend (`"webgl"`, `"webgpu"`, `"wasm"`, `"cpu"`)     |
+| `performance.memoryThreshold`                          | `number`   | `50`      | Tensor count threshold for memory cleanup                            |
+| `onDetection`                                          | `function` | -         | Callback for detection results (not called when detection is paused) |
+| `onCameraReady`                                        | `function` | -         | Callback when camera is ready                                        |
+| `onCameraNotAllowed`                                   | `function` | -         | Callback when camera access is denied                                |
 
 ### Detection Result Properties
 
