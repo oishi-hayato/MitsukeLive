@@ -109,7 +109,7 @@ export class DetectionController {
     // Initialize Web Worker from external TypeScript file
     try {
       this.detectionWorker = new Worker(
-        new URL("./../workers/detection-worker.ts", import.meta.url),
+        new URL("./../workers/detection-worker.ts?worker", import.meta.url),
         {
           type: "module",
         },

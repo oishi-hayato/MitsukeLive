@@ -28,8 +28,4 @@ export default defineConfig({
       outDir: "dist",
     }),
   ],
-  worker: {
-    format: "es",
-    plugins: () => []
-  },
 });
