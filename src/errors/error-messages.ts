@@ -74,11 +74,3 @@ export const ERROR_MESSAGES = {
   // Transform errors
   LETTERBOX_TRANSFORM_FAILED: "Failed to apply letterbox transformation",
 } as const;
-
-export const CONSOLE_MESSAGES = {
-  FATAL_ERROR: "[DetectionController] Fatal error occurred:",
-  NON_FATAL_ERROR:
-    "[DetectionController] Non-fatal error occurred. Processing continues:",
-  UNEXPECTED_ERROR:
-    "[DetectionController] Unexpected error occurred. Processing continues:",
-} as const;

@@ -1,20 +1,18 @@
 import * as tf from "@tensorflow/tfjs";
-import { CameraManager } from "./camera-manager";
-import { CanvasManager } from "./canvas-manager";
-import { YOLOInference } from "./yolo-inference";
 import { MLInternalError } from "../errors";
-import { CONSOLE_MESSAGES } from "../errors/error-messages";
+import { add3DToDetection } from "../helpers/3d-helper";
 import { cropNormalizedVideoTensor } from "../helpers/tensor-helper";
 import { letterboxTransform } from "../helpers/yolo-helper";
-import { add3DToDetection } from "../helpers/3d-helper";
-import { DetectionQueueProcessor } from "./detection-queue-processor";
-import DetectionWorker from "../workers/detection-worker?worker";
 import type {
-  ObjectDetectorOptions,
-  Detection,
   ARDetection,
+  Detection,
   LetterboxInfo,
+  ObjectDetectorOptions,
 } from "../types";
+import { CameraManager } from "./camera-manager";
+import { CanvasManager } from "./canvas-manager";
+import { WorkerQueueController } from "./worker-queue-controller";
+import { YOLOInference } from "./yolo-inference";
 
 // Type definitions
 type TensorFlowBackend = "webgl" | "webgpu" | "wasm" | "cpu";
@@ -48,8 +46,7 @@ export class DetectionController {
   private backend: TensorFlowBackend; // TensorFlow.js backend
   private detectionIntervalId: number | null = null; // Detection interval ID
   private isDetectionRunning = false; // Flag to prevent overlapping detections
-  private detectionWorker: Worker | null = null; // Web Worker for processing detection results
-  private queueProcessor: DetectionQueueProcessor | null = null; // Queue processor instance
+  private workerQueueController: WorkerQueueController | null = null; // Worker queue controller with fallback
 
   // Performance optimization cache
   private cachedCropRegion?: ReturnType<typeof this.calculateCropRegion>; // Crop region cache
@@ -92,45 +89,15 @@ export class DetectionController {
     this.onCameraReady = options.onCameraReady || (() => {});
     this.onCameraNotAllowed = options.onCameraNotAllowed || (() => {});
 
-    // Initialize queue processor
-    this.queueProcessor = new DetectionQueueProcessor(
-      this.onDetection,
-      this.detectionIntervalMs,
-      3, // maxProcessingCount
-      (error: unknown) => {
-        // Handle callback errors - log but continue processing
-        console.error("Detection callback error:", error);
-      },
-    );
-
     // 3D estimation configuration
     this.enable3D = !!options.threeDEstimation;
     this.threeDOptions = options.threeDEstimation;
 
-    // Initialize Web Worker using ?worker import
-    try {
-      this.detectionWorker = new DetectionWorker();
-
-      this.detectionWorker.onerror = (error) => {
-        const wrappedError = new MLInternalError(
-          "WORKER_RUNTIME_ERROR",
-          false,
-          error instanceof Error ? error : new Error(String(error)),
-        );
-        this.handleMLError(wrappedError);
-      };
-
-      this.detectionWorker.onmessage = (event) => {
-        const { type, payload } = event.data;
-        if (type === "process" && payload && "item" in payload) {
-          this.queueProcessor?.enqueueResult(payload.item);
-        }
-      };
-    } catch (error) {
-      console.error("Failed to create worker:", error);
-      this.detectionWorker = null;
-      // Non-fatal since app can continue without worker
-    }
+    // Initialize Worker queue controller with fallback
+    this.workerQueueController = new WorkerQueueController(
+      this.onDetection,
+      this.detectionIntervalMs,
+    );
   }
 
   /**
@@ -162,7 +129,9 @@ export class DetectionController {
     this.setupCanvas(canvasElementId);
     // Start detection loop and queue processor
     this.startDetectionLoop();
-    this.queueProcessor?.start();
+
+    // Start Worker queue processing
+    this.workerQueueController?.start();
   }
 
   private async setupCamera(videoElementId: string): Promise<void> {
@@ -269,7 +238,11 @@ export class DetectionController {
       this.handleMLError(error);
     } else {
       // Wrap unexpected errors in MLInternalError
-      const wrappedError = new MLInternalError("UNEXPECTED_DETECTION_ERROR", true, error as Error);
+      const wrappedError = new MLInternalError(
+        "UNEXPECTED_DETECTION_ERROR",
+        true,
+        error as Error,
+      );
       this.handleMLError(wrappedError);
     }
   }
@@ -289,7 +262,6 @@ export class DetectionController {
    * @param error Fatal error
    */
   private handleFatalError(error: MLInternalError): void {
-    console.error(CONSOLE_MESSAGES.FATAL_ERROR, error);
     this.pause();
     throw error;
   }
@@ -314,11 +286,9 @@ export class DetectionController {
         ) as ARDetection;
       }
 
-      // Apply queue logic using queue processor
-      this.queueProcessor?.enqueueResult(result as ARDetection | null);
+      this.workerQueueController?.enqueueResult(result as ARDetection);
     } else {
-      // Apply queue logic using queue processor
-      this.queueProcessor?.enqueueResult(null);
+      this.workerQueueController?.enqueueResult(null);
     }
   }
 
@@ -349,8 +319,7 @@ export class DetectionController {
     }
 
     // Stop detection worker and queue processor
-    this.detectionWorker?.postMessage({ type: "stop" });
-    this.queueProcessor?.stop();
+    this.workerQueueController?.stop();
 
     // Reset detection flags
     this.isDetectionRunning = false;
@@ -373,13 +342,8 @@ export class DetectionController {
       this.detectionState = DetectionState.IDLE;
       // Restart detection interval
       this.startDetectionLoop();
-      // Restart detection worker
-      this.detectionWorker?.postMessage({
-        type: "start",
-        payload: { intervalMs: this.detectionIntervalMs },
-      });
-      // Restart queue processor
-      this.queueProcessor?.start();
+      // Restart detection worker and queue processor
+      this.workerQueueController?.start();
     };
 
     if (this.video.paused) {
@@ -593,14 +557,8 @@ export class DetectionController {
     }
 
     // Dispose detection worker and queue processor
-    if (this.detectionWorker) {
-      this.detectionWorker.postMessage({ type: "dispose" });
-      this.detectionWorker.terminate();
-      this.detectionWorker = null;
-    }
-
-    this.queueProcessor?.stop();
-    this.queueProcessor = null;
+    this.workerQueueController?.dispose();
+    this.workerQueueController = null;
 
     // Reset detection flags
     this.isDetectionRunning = false;
@@ -643,7 +601,11 @@ export class DetectionController {
       await tf.setBackend(this.backend);
       await tf.ready();
     } catch (error) {
-      throw new MLInternalError("TENSORFLOW_BACKEND_SETUP_FAILED", true, error as Error);
+      throw new MLInternalError(
+        "TENSORFLOW_BACKEND_SETUP_FAILED",
+        true,
+        error as Error,
+      );
     }
   }
 }

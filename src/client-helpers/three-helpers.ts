@@ -7,8 +7,8 @@
  */
 
 import * as THREE from "three";
-import type { ARDetection } from "../types";
 import { convertDegreesToRadians } from "../helpers/math-helper";
+import type { ARDetection } from "../types";
 
 /**
  * Convert detection coordinates to normalized device coordinates (-1 to 1)

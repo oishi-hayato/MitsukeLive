@@ -1,5 +1,5 @@
-import type { Detection, ARDetection } from "../types";
 import { MLInternalError } from "../errors";
+import type { ARDetection, Detection } from "../types";
 
 /**
  * Visual effect configuration options
