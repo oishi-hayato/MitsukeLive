@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 
 export default defineConfig({
-  base: '',
+  base: "./",
   build: {
     lib: {
       entry: "src/main.ts",
@@ -16,7 +16,7 @@ export default defineConfig({
         preserveModules: true,
         preserveModulesRoot: "src",
         entryFileNames: "[name].js",
-        manualChunks: undefined, // Disable manual chunking for individual files
+        manualChunks: undefined,
       },
     },
     sourcemap: true,

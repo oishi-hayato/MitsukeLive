@@ -57,26 +57,4 @@ export class WorkerQueueManager<T = unknown> {
       this.intervalId = null;
     }
   }
-
-  /**
-   * Get current running status
-   */
-  public getIsRunning(): boolean {
-    return this.isRunning;
-  }
-
-  /**
-   * Get current queue status (for debugging)
-   */
-  public getQueueStatus(): {
-    isEmpty: boolean;
-    hasItem: boolean;
-    item?: T | null;
-  } {
-    return {
-      isEmpty: isQueueEmpty(this.queue),
-      hasItem: !isQueueEmpty(this.queue),
-      item: this.queue,
-    };
-  }
 }

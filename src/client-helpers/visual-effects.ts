@@ -41,7 +41,7 @@ export function startFlashEffect(
   return new Promise<void>((resolve) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      throw new MLInternalError("FAILED_TO_GET_2D_CONTEXT", true);
+      throw new MLInternalError("FAILED_TO_GET_2D_CONTEXT");
     }
 
     let isVisible = true;

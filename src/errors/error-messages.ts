@@ -49,7 +49,30 @@ export const ERROR_MESSAGES = {
 
   // Worker errors
   WORKER_CREATION_FAILED: "Failed to create web worker",
+  WORKER_RUNTIME_ERROR: "Web worker runtime error occurred",
   CAMERA_SETUP_FAILED: "Failed to setup camera",
+
+  // User callback errors
+  USER_CALLBACK_ERROR: "Error in user-provided callback function",
+
+  // Detection processing errors
+  UNEXPECTED_DETECTION_ERROR: "Unexpected error during detection processing",
+
+  // Camera access errors
+  CAMERA_ACCESS_FAILED: "Failed to access camera device",
+
+  // Tensor operations errors
+  VIDEO_NOT_READY_FOR_TENSOR_CONVERSION:
+    "Video element not ready for tensor conversion",
+  FAILED_TO_CREATE_VIDEO_TENSOR: "Failed to create tensor from video element",
+  INVALID_CROP_PARAMETERS: "Invalid parameters for tensor cropping",
+  TENSOR_CROP_FAILED: "Failed to crop video tensor",
+
+  // TensorFlow backend errors
+  TENSORFLOW_BACKEND_SETUP_FAILED: "Failed to setup TensorFlow.js backend",
+
+  // Transform errors
+  LETTERBOX_TRANSFORM_FAILED: "Failed to apply letterbox transformation",
 } as const;
 
 export const CONSOLE_MESSAGES = {

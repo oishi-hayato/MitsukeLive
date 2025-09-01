@@ -112,18 +112,24 @@ export class DetectionController {
       this.detectionWorker = new DetectionWorker();
 
       this.detectionWorker.onerror = (error) => {
-        console.error("Worker error:", error);
+        const wrappedError = new MLInternalError(
+          "WORKER_RUNTIME_ERROR",
+          false,
+          error instanceof Error ? error : new Error(String(error)),
+        );
+        this.handleMLError(wrappedError);
       };
 
       this.detectionWorker.onmessage = (event) => {
         const { type, payload } = event.data;
         if (type === "process" && payload && "item" in payload) {
-          this.onDetection(payload.item);
+          this.queueProcessor?.enqueueResult(payload.item);
         }
       };
     } catch (error) {
       console.error("Failed to create worker:", error);
       this.detectionWorker = null;
+      // Non-fatal since app can continue without worker
     }
   }
 
@@ -262,8 +268,9 @@ export class DetectionController {
     if (error instanceof MLInternalError) {
       this.handleMLError(error);
     } else {
-      // Unexpected errors will be wrapped by MLClientError at the boundary
-      throw error;
+      // Wrap unexpected errors in MLInternalError
+      const wrappedError = new MLInternalError("UNEXPECTED_DETECTION_ERROR", true, error as Error);
+      this.handleMLError(wrappedError);
     }
   }
 
@@ -274,8 +281,6 @@ export class DetectionController {
   private handleMLError(error: MLInternalError): void {
     if (error.fatal) {
       this.handleFatalError(error);
-    } else {
-      this.handleNonFatalError(error);
     }
   }
 
@@ -287,14 +292,6 @@ export class DetectionController {
     console.error(CONSOLE_MESSAGES.FATAL_ERROR, error);
     this.pause();
     throw error;
-  }
-
-  /**
-   * Handle non-fatal errors
-   * @param error Non-fatal error
-   */
-  private handleNonFatalError(error: MLInternalError): void {
-    console.warn(CONSOLE_MESSAGES.NON_FATAL_ERROR, error);
   }
 
   /**
@@ -381,6 +378,8 @@ export class DetectionController {
         type: "start",
         payload: { intervalMs: this.detectionIntervalMs },
       });
+      // Restart queue processor
+      this.queueProcessor?.start();
     };
 
     if (this.video.paused) {
@@ -640,7 +639,11 @@ export class DetectionController {
    * Sets up specified backend (webgl/webgpu/cpu, etc.)
    */
   private async setupBackend(): Promise<void> {
-    await tf.setBackend(this.backend);
-    await tf.ready();
+    try {
+      await tf.setBackend(this.backend);
+      await tf.ready();
+    } catch (error) {
+      throw new MLInternalError("TENSORFLOW_BACKEND_SETUP_FAILED", true, error as Error);
+    }
   }
 }

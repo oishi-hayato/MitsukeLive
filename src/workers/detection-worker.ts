@@ -22,15 +22,8 @@ self.onmessage = (event) => {
         queueManager.enqueue(payload.item);
       }
       break;
-    case "status":
-      // Debug endpoint to check queue status
-      self.postMessage({
-        type: "status-response",
-        payload: {
-          isRunning: queueManager.getIsRunning(),
-          queueStatus: queueManager.getQueueStatus(),
-        },
-      });
+    case "dispose":
+      queueManager.stop();
       break;
   }
 };
