@@ -1,4 +1,5 @@
 import type { Detection, ARDetection } from "../types";
+import { MLInternalError } from "../errors";
 
 /**
  * Visual effect configuration options
@@ -40,7 +41,7 @@ export function startFlashEffect(
   return new Promise<void>((resolve) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      throw new Error("Canvas 2D context not available");
+      throw new MLInternalError("FAILED_TO_GET_2D_CONTEXT", true);
     }
 
     let isVisible = true;

@@ -46,6 +46,10 @@ export const ERROR_MESSAGES = {
   // Camera Manager errors
   VIDEO_ELEMENT_NOT_FOUND: "Video element not found",
   NOT_A_VIDEO_ELEMENT: "Specified element is not a video element",
+
+  // Worker errors
+  WORKER_CREATION_FAILED: "Failed to create web worker",
+  CAMERA_SETUP_FAILED: "Failed to setup camera",
 } as const;
 
 export const CONSOLE_MESSAGES = {
