@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { WorkerQueueManager } from "./worker-queue-manager.js";
+import { WorkerQueueManager } from "./worker-queue-manager";
 
 // Initialize queue manager
 const queueManager = new WorkerQueueManager();

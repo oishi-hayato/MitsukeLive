@@ -8,6 +8,7 @@ import { cropNormalizedVideoTensor } from "../helpers/tensor-helper";
 import { letterboxTransform } from "../helpers/yolo-helper";
 import { add3DToDetection } from "../helpers/3d-helper";
 import { DetectionQueueProcessor } from "./detection-queue-processor";
+import DetectionWorker from "../workers/detection-worker?worker";
 import type {
   ObjectDetectorOptions,
   Detection,
@@ -106,29 +107,24 @@ export class DetectionController {
     this.enable3D = !!options.threeDEstimation;
     this.threeDOptions = options.threeDEstimation;
 
-    // Initialize Web Worker from external TypeScript file
+    // Initialize Web Worker using ?worker import
     try {
-      this.detectionWorker = new Worker(
-        new URL("./../workers/detection-worker.ts?worker", import.meta.url),
-        {
-          type: "module",
-        },
-      );
+      this.detectionWorker = new DetectionWorker();
 
       this.detectionWorker.onerror = (error) => {
         console.error("Worker error:", error);
       };
-    } catch (error) {
-      throw new MLInternalError("WORKER_CREATION_FAILED");
-    }
 
-    // Handle messages from worker
-    this.detectionWorker.onmessage = (event) => {
-      const { type, payload } = event.data;
-      if (type === "process" && payload && "item" in payload) {
-        this.onDetection(payload.item);
-      }
-    };
+      this.detectionWorker.onmessage = (event) => {
+        const { type, payload } = event.data;
+        if (type === "process" && payload && "item" in payload) {
+          this.onDetection(payload.item);
+        }
+      };
+    } catch (error) {
+      console.error("Failed to create worker:", error);
+      this.detectionWorker = null;
+    }
   }
 
   /**
@@ -587,122 +583,6 @@ export class DetectionController {
    * Release all resources and clean up memory
    * Properly dispose of camera, canvas, and inference instances
    */
-  /**
-   * Execute detection processing in worker
-   * Runs all detection logic in the web worker thread
-   */
-  public async executeInWorker(): Promise<void> {
-    if (!this.detectionWorker) {
-      console.warn("Detection worker is not running");
-      return;
-    }
-
-    try {
-      // Get detection results
-      const detectionResults = await this.detectObjects();
-
-      // Process results and send to worker
-      if (detectionResults.length > 0) {
-        let result = detectionResults[0];
-
-        // Add 3D information if enabled
-        if (this.enable3D && this.threeDOptions) {
-          result = add3DToDetection(
-            result,
-            this.canvas.width,
-            this.threeDOptions.objectSize,
-            this.threeDOptions.orientationCoefficients,
-          ) as ARDetection;
-        }
-
-        // Send success result to worker
-        this.detectionWorker.postMessage({
-          type: "enqueue",
-          payload: { item: result },
-        });
-      } else {
-        // Send failure (null) to worker
-        this.detectionWorker.postMessage({
-          type: "enqueue",
-          payload: { item: null },
-        });
-      }
-    } catch (error) {
-      // Send failure to worker on error
-      this.detectionWorker.postMessage({
-        type: "enqueue",
-        payload: { item: null },
-      });
-      this.handleDetectionError(error);
-    }
-  }
-
-  /**
-   * Start worker-based detection loop
-   */
-  public startWorkerDetection(): void {
-    if (!this.detectionWorker) {
-      console.error("Detection worker not initialized");
-      return;
-    }
-
-    // Start the worker
-    this.detectionWorker.postMessage({
-      type: "start",
-      payload: { intervalMs: this.detectionIntervalMs },
-    });
-
-    // Start detection execution loop
-    this.scheduleWorkerDetection();
-  }
-
-  /**
-   * Schedule worker-based detection execution
-   */
-  private scheduleWorkerDetection(): void {
-    const schedule = () => {
-      this.detectionIntervalId = setTimeout(() => {
-        // Execute detection in worker asynchronously
-        setTimeout(() => {
-          this.executeWorkerDetectionCycle();
-        }, 0);
-
-        // Continue scheduling
-        if (this.detectionIntervalId !== null) {
-          schedule();
-        }
-      }, this.detectionIntervalMs);
-    };
-
-    schedule();
-  }
-
-  /**
-   * Execute single detection cycle for worker
-   */
-  private async executeWorkerDetectionCycle(): Promise<void> {
-    const currentTime = Date.now();
-
-    // Check execution conditions and prevent overlapping detections
-    if (!this.shouldExecuteDetection(currentTime) || this.isDetectionRunning) {
-      return;
-    }
-
-    this.isDetectionRunning = true;
-    this.detectionState = DetectionState.PROCESSING;
-    this.lastDetectionTimestamp = currentTime;
-
-    try {
-      await this.executeInWorker();
-    } catch (error) {
-      this.handleDetectionError(error);
-    } finally {
-      this.isDetectionRunning = false;
-      if (this.detectionState === DetectionState.PROCESSING) {
-        this.detectionState = DetectionState.IDLE;
-      }
-    }
-  }
 
   public dispose(): void {
     this.detectionState = DetectionState.PAUSED;
