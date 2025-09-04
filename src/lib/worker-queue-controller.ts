@@ -184,6 +184,8 @@ export class WorkerQueueController {
   public stop(): void {
     if (this.detectionWorker) {
       this.detectionWorker.postMessage({ type: "stop" });
+      this.detectionWorker.terminate();
+      this.detectionWorker = null;
     } else {
       // Fallback to main thread queue processor
       this.queueProcessor?.stop();
