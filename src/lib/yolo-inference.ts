@@ -9,6 +9,9 @@ import type {
   YOLOMetadata,
 } from "../types";
 
+// Constants
+const BYTES_TO_MB = 1024 * 1024;
+
 /**
  * YOLO Inference Instance
  * Real-time object detection using TensorFlow.js
@@ -158,10 +161,10 @@ export class YOLOInference {
    */
   public logMemoryUsage(): void {
     const memoryInfo = tf.memory();
+    const memoryMB = (memoryInfo.numBytes / BYTES_TO_MB).toFixed(2);
+
     console.info(
-      `[YOLOEngine] Memory: ${memoryInfo.numTensors} tensors, ${(
-        memoryInfo.numBytes / 1024 / 1024
-      ).toFixed(2)}MB`,
+      `[YOLOEngine] Memory: ${memoryInfo.numTensors} tensors, ${memoryMB}MB`,
     );
 
     if (memoryInfo.numTensors > this.memoryThreshold) {
@@ -178,10 +181,10 @@ export class YOLOInference {
   private cleanupMemory(): void {
     tf.disposeVariables();
     const memoryInfo = tf.memory();
+    const memoryMB = (memoryInfo.numBytes / BYTES_TO_MB).toFixed(2);
+
     console.info(
-      `[YOLOEngine] Memory cleanup completed: ${
-        memoryInfo.numTensors
-      } tensors, ${(memoryInfo.numBytes / 1024 / 1024).toFixed(2)}MB`,
+      `[YOLOEngine] Memory cleanup completed: ${memoryInfo.numTensors} tensors, ${memoryMB}MB`,
     );
   }
 }

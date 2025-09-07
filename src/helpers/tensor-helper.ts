@@ -16,7 +16,11 @@ function getNormalizedVideoTensor(videoElement: HTMLVideoElement): tf.Tensor3D {
   }
 
   try {
-    return tf.browser.fromPixels(videoElement).toFloat().div(tf.scalar(255.0));
+    return tf.tidy(() => {
+      const pixelTensor = tf.browser.fromPixels(videoElement);
+      const floatTensor = pixelTensor.toFloat();
+      return floatTensor.div(tf.scalar(255.0));
+    });
   } catch (error) {
     throw new MLInternalError(
       "FAILED_TO_CREATE_VIDEO_TENSOR",
