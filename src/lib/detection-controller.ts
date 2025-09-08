@@ -48,11 +48,6 @@ export class DetectionController {
   private isDetectionRunning = false; // Flag to prevent overlapping detections
   private workerQueueController: WorkerQueueController | null = null; // Worker queue controller with fallback
 
-  // Performance optimization cache
-  private cachedCropRegion?: ReturnType<typeof this.calculateCropRegion>; // Crop region cache
-  private lastVideoDimensions?: { width: number; height: number }; // Previous video dimensions
-  private lastCanvasDimensions?: { width: number; height: number }; // Previous canvas dimensions
-
   private onDetection: (detection: Detection | ARDetection | null) => void; // Detection result callback
   private onCameraReady: () => void; // Camera ready callback
   private onCameraNotAllowed: () => void; // Camera access denied callback
@@ -151,9 +146,9 @@ export class DetectionController {
    * @returns Array of detection results (in canvas coordinate system)
    */
   private async detectObjects(): Promise<Detection[]> {
-    // Calculate crop region based on aspect ratio (using cache)
+    // Calculate crop region based on aspect ratio
     const { cropX, cropY, croppedWidth, croppedHeight } =
-      this.getCachedCropRegion();
+      this.calculateCropRegion();
 
     // Create tensor and run YOLO inference
     const { detectionResults } = await this.preprocessVideoFrameAndPredict(
@@ -188,9 +183,9 @@ export class DetectionController {
     const schedule = () => {
       this.detectionIntervalId = setTimeout(() => {
         // Execute detection asynchronously
-        setTimeout(() => {
+        queueMicrotask(() => {
           this.executeDetectionCycle();
-        }, 0);
+        });
 
         // Continue scheduling
         if (this.detectionIntervalId !== null) {
@@ -340,21 +335,14 @@ export class DetectionController {
     const restartDetection = () => {
       this.lastDetectionTimestamp = 0;
       this.detectionState = DetectionState.IDLE;
-      // Restart detection interval
       this.startDetectionLoop();
-      // Restart detection worker and queue processor
       this.workerQueueController?.start();
     };
 
     if (this.video.paused) {
-      try {
-        await this.video.play();
-      } finally {
-        setTimeout(restartDetection, RESUME_DELAY_MS);
-      }
-    } else {
-      setTimeout(restartDetection, RESUME_DELAY_MS);
+      await this.video.play().catch(() => {});
     }
+    setTimeout(restartDetection, RESUME_DELAY_MS);
   }
 
   /**
@@ -465,48 +453,6 @@ export class DetectionController {
   }
 
   /**
-   * Get crop region using cache
-   * Returns cached values if there are no changes to video and canvas sizes
-   * @returns Coordinates and dimensions of crop region
-   */
-  private getCachedCropRegion(): {
-    cropX: number;
-    cropY: number;
-    croppedWidth: number;
-    croppedHeight: number;
-  } {
-    const video = this.video;
-    const canvas = this.canvas;
-    const currentVideoDimensions = {
-      width: video.videoWidth,
-      height: video.videoHeight,
-    };
-    const currentCanvasDimensions = {
-      width: canvas.width,
-      height: canvas.height,
-    };
-
-    // Check if cache is valid (both video and canvas sizes)
-    if (
-      this.cachedCropRegion &&
-      this.lastVideoDimensions &&
-      this.lastCanvasDimensions &&
-      this.lastVideoDimensions.width === currentVideoDimensions.width &&
-      this.lastVideoDimensions.height === currentVideoDimensions.height &&
-      this.lastCanvasDimensions.width === currentCanvasDimensions.width &&
-      this.lastCanvasDimensions.height === currentCanvasDimensions.height
-    ) {
-      return this.cachedCropRegion;
-    }
-
-    // Calculate new values and cache them
-    this.cachedCropRegion = this.calculateCropRegion();
-    this.lastVideoDimensions = currentVideoDimensions;
-    this.lastCanvasDimensions = currentCanvasDimensions;
-    return this.cachedCropRegion;
-  }
-
-  /**
    * Calculate crop region based on aspect ratios of video and canvas
    * Adjusts for aspect ratio differences to extract appropriate region
    * @returns Coordinates and dimensions of crop region
@@ -574,11 +520,6 @@ export class DetectionController {
       this.canvasManager.dispose();
       this.canvasManager = null;
     }
-
-    // Clear cache
-    this.cachedCropRegion = undefined;
-    this.lastVideoDimensions = undefined;
-    this.lastCanvasDimensions = undefined;
 
     // Dispose inference instance
     this.yoloInference.dispose();

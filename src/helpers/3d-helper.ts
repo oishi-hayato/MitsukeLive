@@ -4,16 +4,7 @@ import type { ARDetection, Detection } from "../types";
 // Constants
 const CONSISTENCY_EPS = 0.25; // 25% tolerance for width/height-based depth agreement
 const DIVISION_SAFETY_EPSILON = 1e-6; // small value to prevent division by zero
-
-/**
- * Get focal length scale factor for common web cameras
- *
- * @returns Focal length scale factor (fixed at 0.8 for simplicity)
- */
-function getFocalScale(): number {
-  // Empirical value for common web cameras and smartphone cameras
-  return 0.8;
-}
+const FOCAL_SCALE = 0.8; // Empirical value for common web cameras and smartphone cameras
 
 /**
  * Physics-based pitch estimation from aspect ratio change
@@ -101,11 +92,8 @@ export function estimate3DInfo(
 ) {
   const [, , width, height] = boundingBox;
 
-  // Use default configuration values
-  const focalScale = getFocalScale();
-
   // Calculate focal length in pixels
-  const focalLength = focalScale * imageWidth;
+  const focalLength = FOCAL_SCALE * imageWidth;
 
   if (!Number.isFinite(width) || !Number.isFinite(height)) {
     throw new MLInternalError("BOUNDING_BOX_SIZE_INVALID");

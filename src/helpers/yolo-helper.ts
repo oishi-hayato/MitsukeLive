@@ -8,6 +8,28 @@ type BoundingBox = [number, number, number, number];
 type Rect = { x: number; y: number; width: number; height: number };
 type PaddingList = [[number, number], [number, number], [number, number]];
 
+/**
+ * Validate coordinate values (x, y, width, height)
+ */
+function validateCoordinates(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height)
+  ) {
+    throw new MLInternalError("INVALID_COORDINATE_VALUES", false);
+  }
+  if (width < 0 || height < 0) {
+    throw new MLInternalError("NEGATIVE_WIDTH_OR_HEIGHT", false);
+  }
+}
+
 // Constants
 
 /**
@@ -163,15 +185,8 @@ export function letterboxToOriginal(
   top: number,
   left: number,
 ): Rect {
-  // Input validation: Check if finite numbers
-  if (
-    !Number.isFinite(x) ||
-    !Number.isFinite(y) ||
-    !Number.isFinite(width) ||
-    !Number.isFinite(height)
-  ) {
-    throw new MLInternalError("INVALID_COORDINATE_VALUES", false);
-  }
+  // Input validation
+  validateCoordinates(x, y, width, height);
 
   if (!Number.isFinite(scale) || scale <= 0) {
     throw new MLInternalError("INVALID_SCALE_VALUE", false);
@@ -179,11 +194,6 @@ export function letterboxToOriginal(
 
   if (!Number.isFinite(top) || !Number.isFinite(left)) {
     throw new MLInternalError("INVALID_PADDING_VALUES", false);
-  }
-
-  // Error if width and height are negative
-  if (width < 0 || height < 0) {
-    throw new MLInternalError("NEGATIVE_WIDTH_OR_HEIGHT", false);
   }
 
   return {
@@ -207,15 +217,8 @@ export function originalToCanvas(
   canvasElement: HTMLCanvasElement,
   croppedSize: { width: number; height: number },
 ): Rect {
-  // Input validation: Check if finite numbers
-  if (
-    !Number.isFinite(rect.x) ||
-    !Number.isFinite(rect.y) ||
-    !Number.isFinite(rect.width) ||
-    !Number.isFinite(rect.height)
-  ) {
-    throw new MLInternalError("INVALID_COORDINATE_VALUES", false);
-  }
+  // Input validation
+  validateCoordinates(rect.x, rect.y, rect.width, rect.height);
 
   if (
     !Number.isFinite(croppedSize.width) ||
@@ -230,11 +233,6 @@ export function originalToCanvas(
 
   if (canvasElement.width <= 0 || canvasElement.height <= 0) {
     throw new MLInternalError("INVALID_CANVAS_SIZE", false);
-  }
-
-  // Error if width and height are negative
-  if (rect.width < 0 || rect.height < 0) {
-    throw new MLInternalError("NEGATIVE_WIDTH_OR_HEIGHT", false);
   }
 
   // Calculate aspect ratio preserving scale from crop region to canvas
@@ -363,77 +361,61 @@ export function findValidDetections(
   numDetections: number,
   scoreThreshold: number,
 ): Detection[] {
-  // Input validation
-  if (
-    !data ||
-    data.length < 5 || // Minimum 5 arrays required (4 for boundingBox + 1 for score)
-    !Number.isFinite(numDetections) ||
-    numDetections < 0 ||
-    !Number.isFinite(scoreThreshold) ||
-    scoreThreshold < 0 ||
-    scoreThreshold > 1
-  ) {
+  if (!data || data.length < 5 || numDetections <= 0) {
     return [];
   }
 
-  // Check minimum length of each array
-  const minRequiredLength = Math.min(
-    data[0]?.length || 0,
-    data[1]?.length || 0,
-    data[2]?.length || 0,
-    data[3]?.length || 0,
-    data[4]?.length || 0,
-  );
-
-  if (minRequiredLength === 0) {
-    return [];
-  }
-
-  // Limit actual number of detections
-  const actualDetections = Math.min(numDetections, minRequiredLength);
-
+  const actualDetections = Math.min(numDetections, data[0]?.length || 0);
   const validDetections: Detection[] = [];
 
   for (let i = 0; i < actualDetections; i++) {
-    const score = data[4][i];
-
-    // Validate score value
-    if (!Number.isFinite(score) || score <= scoreThreshold) {
-      continue;
+    const detection = createDetectionIfValid(data, i, scoreThreshold);
+    if (detection) {
+      validDetections.push(detection);
     }
-
-    // Validate bounding box - YOLO outputs center coordinates
-    const centerX = data[0][i];
-    const centerY = data[1][i];
-    const width = data[2][i];
-    const height = data[3][i];
-
-    if (
-      !Number.isFinite(centerX) ||
-      !Number.isFinite(centerY) ||
-      !Number.isFinite(width) ||
-      !Number.isFinite(height) ||
-      width < 0 ||
-      height < 0
-    ) {
-      continue;
-    }
-
-    // Get and validate angle
-    let angle = 0;
-    if (data[5] && i < data[5].length) {
-      const angleValue = data[5][i];
-      angle = Number.isFinite(angleValue) ? angleValue : 0;
-    }
-
-    const detectionBBox: BoundingBox = [centerX, centerY, width, height];
-    validDetections.push({
-      boundingBox: detectionBBox,
-      angle,
-      score,
-    });
   }
 
-  // Sort by score descending
   return validDetections.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Create detection object if all values are valid
+ */
+function createDetectionIfValid(
+  data: number[][],
+  index: number,
+  scoreThreshold: number,
+): Detection | null {
+  const score = data[4][index];
+  if (!Number.isFinite(score) || score <= scoreThreshold) {
+    return null;
+  }
+
+  const centerX = data[0][index];
+  const centerY = data[1][index];
+  const width = data[2][index];
+  const height = data[3][index];
+
+  if (
+    !Number.isFinite(centerX) ||
+    !Number.isFinite(centerY) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width < 0 ||
+    height < 0
+  ) {
+    return null;
+  }
+
+  let angle = 0;
+  if (data[5] && index < data[5].length) {
+    const angleValue = data[5][index];
+    angle = Number.isFinite(angleValue) ? angleValue : 0;
+  }
+
+  return {
+    boundingBox: [centerX, centerY, width, height] as BoundingBox,
+    angle,
+    score,
+  };
 }

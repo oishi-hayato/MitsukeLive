@@ -39,7 +39,7 @@ export function normalizeDetectionCoordinates(
  * @param halfTanFov Half tangent of field of view
  * @returns World position as Vector3
  */
-export function calculateWorldPosition(
+function calculateWorldPosition(
   normalizedX: number,
   normalizedY: number,
   depth: number,
@@ -63,27 +63,12 @@ export interface ViewportConfig {
   fov: number;
 }
 
-// ========================================
-// Top-Level Group Processing
-// ========================================
-
-/**
- * Hide Group and all its children
- * Hide entire Group
- */
-export function hideTopLevelGroup(group: THREE.Group): void {
-  group.visible = false;
-  group.traverse((child) => {
-    child.visible = false;
-  });
-}
-
 /**
  * Calculate position and transform data without applying to object
  *
  * Returns calculated position, rotation, and scale values for AR objects
  */
-export function calculateARTransform(
+function calculateARTransform(
   detection: ARDetection,
   viewport: ViewportConfig,
   halfTanFov: number,
