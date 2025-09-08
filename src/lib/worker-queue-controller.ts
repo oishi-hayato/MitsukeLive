@@ -184,6 +184,7 @@ export class WorkerQueueController {
   public stop(): void {
     if (this.detectionWorker) {
       this.detectionWorker.postMessage({ type: "stop" });
+      // Don't terminate here - let dispose() handle termination
     } else {
       // Fallback to main thread queue processor
       this.queueProcessor?.stop();
@@ -195,9 +196,16 @@ export class WorkerQueueController {
    */
   public dispose(): void {
     if (this.detectionWorker) {
+      // Send dispose message to allow Worker to clean up properly
       this.detectionWorker.postMessage({ type: "dispose" });
-      this.detectionWorker.terminate();
-      this.detectionWorker = null;
+
+      // Give Worker time to cleanup before termination
+      setTimeout(() => {
+        if (this.detectionWorker) {
+          this.detectionWorker.terminate();
+          this.detectionWorker = null;
+        }
+      }, 100);
     }
 
     this.queueProcessor?.stop();
